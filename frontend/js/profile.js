@@ -17,9 +17,16 @@ const ProfileModule = {
     document.getElementById('profileDisplayName').textContent = user.display_name;
     document.getElementById('profileUsername').textContent = '@' + user.username;
     const roleEl = document.getElementById('profileRole');
-    roleEl.textContent = user.role === 'admin' ? '管理者' : '學生';
-    roleEl.style.background = user.role === 'admin' ? 'rgba(124,58,237,0.25)' : 'rgba(59,130,246,0.2)';
-    roleEl.style.color = user.role === 'admin' ? '#C4B5FD' : '#93C5FD';
+    const roleMap = {
+      superadmin: { label: '👑 最高管理員', bg: 'rgba(124,58,237,0.25)', color: '#C4B5FD' },
+      teacher:    { label: '🎓 老師',       bg: 'rgba(16,185,129,0.2)',  color: '#34D399' },
+      student:    { label: '🎒 學生',       bg: 'rgba(59,130,246,0.2)',  color: '#93C5FD' },
+      admin:      { label: '👑 最高管理員', bg: 'rgba(124,58,237,0.25)', color: '#C4B5FD' }, // 舊 token 相容
+    };
+    const roleInfo = roleMap[user.role] || roleMap.student;
+    roleEl.textContent = roleInfo.label;
+    roleEl.style.background = roleInfo.bg;
+    roleEl.style.color = roleInfo.color;
 
     document.getElementById('newDisplayName').value = user.display_name;
 
