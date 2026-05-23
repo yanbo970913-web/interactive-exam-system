@@ -90,6 +90,11 @@ const API = (() => {
       toggleSubject: (id)         => request('PATCH',  `/admin/subjects/${id}/toggle`),
       deleteSubject: (id)         => request('DELETE', `/admin/subjects/${id}`),
     },
+    // 即時進度
+    live: {
+      heartbeat: (data) => request('POST', '/live/heartbeat', data),
+      leave:     (data) => request('POST', '/live/leave', data),
+    },
     // 健康
     health: () => request('GET', '/health'),
   };

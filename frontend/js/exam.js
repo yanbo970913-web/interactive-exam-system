@@ -99,6 +99,8 @@ const ExamModule = {
   timerInterval: null,
   remainingSeconds: 0,
   subjectName: '',
+  _keyHandler: null,
+  _heartbeatTimer: null,
 
   async startExam(examId) {
     Loading.show('準備考題中...');
@@ -117,6 +119,9 @@ const ExamModule = {
 
       this.render();
       this.startTimer();
+      this._attachKeyboard();
+      // 每 30 秒自動送心跳（防頻寬浪費）
+      this._heartbeatTimer = setInterval(() => this.sendHeartbeat(), 30000);
       App.navigate('exam-taking');
     } catch (err) {
       Toast.error(err.message || '無法開始考試');
@@ -129,6 +134,8 @@ const ExamModule = {
     this.renderQuestion();
     this.updateProgress();
     this.updateDots();
+    // 換題時立即送心跳（非同步，不阻塞 UI）
+    this.sendHeartbeat();
   },
 
   renderQuestion() {
@@ -263,6 +270,66 @@ const ExamModule = {
       clearInterval(this.timerInterval);
       this.timerInterval = null;
     }
+    if (this._heartbeatTimer) {
+      clearInterval(this._heartbeatTimer);
+      this._heartbeatTimer = null;
+    }
+  },
+
+  /* ── 鍵盤快捷鍵 ── */
+  _attachKeyboard() {
+    this._detachKeyboard();
+    this._keyHandler = (e) => {
+      // 如果焦點在輸入框則不攔截
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      const q = this.questions[this.currentIndex];
+      if (q && q.type === 'choice') {
+        const idx = ['a','b','c','d','e'].indexOf(e.key.toLowerCase());
+        if (idx >= 0 && Array.isArray(q.options) && idx < q.options.length) {
+          this.selectOption(q.id, q.options[idx]);
+          return;
+        }
+      }
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        this.nextQuestion();
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        this.prevQuestion();
+      }
+    };
+    document.addEventListener('keydown', this._keyHandler);
+  },
+
+  _detachKeyboard() {
+    if (this._keyHandler) {
+      document.removeEventListener('keydown', this._keyHandler);
+      this._keyHandler = null;
+    }
+  },
+
+  /* ── 即時心跳（通知管理者進度）── */
+  sendHeartbeat() {
+    if (!this.attemptId || !this.examInfo) return;
+    const answered = Object.keys(this.answers).filter(k => this.answers[k] !== '').length;
+    API.live.heartbeat({
+      attempt_id:    this.attemptId,
+      exam_id:       this.examInfo.id,
+      exam_title:    this.examInfo.title,
+      subject_name:  this.examInfo.subject_name || '',
+      subject_icon:  this.examInfo.subject_icon || '📚',
+      current_index: this.currentIndex,
+      total:         this.questions.length,
+      answered_count: answered
+    }).catch(() => {}); // fire-and-forget
+  },
+
+  /* ── 離開考試（交卷/自動交卷）── */
+  sendLeave() {
+    if (!this.attemptId) return;
+    API.live.leave({ attempt_id: this.attemptId }).catch(() => {});
   },
 
   confirmSubmit() {
@@ -300,6 +367,8 @@ const ExamModule = {
   async doSubmit(isAutoSubmit = false) {
     this.closeSubmitModal();
     this.stopTimer();
+    this._detachKeyboard();
+    this.sendLeave(); // 通知管理者學生已交卷
     Loading.show('提交答案中...');
 
     try {
@@ -311,6 +380,7 @@ const ExamModule = {
       Toast.error('提交失敗：' + (err.message || '未知錯誤'));
       if (!isAutoSubmit) {
         this.startTimer();
+        this._attachKeyboard();
       }
     }
   }

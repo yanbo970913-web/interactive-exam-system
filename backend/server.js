@@ -24,6 +24,7 @@ app.use('/api/questions', require('./routes/questions'));
 app.use('/api/exams',     require('./routes/exams'));
 app.use('/api/ai',        require('./routes/ai'));
 app.use('/api/admin',     require('./routes/admin'));
+app.use('/api/live',      require('./routes/live'));
 
 // ── 健康檢查
 app.get('/api/health', (req, res) => {
@@ -78,7 +79,7 @@ app.listen(PORT, () => {
   console.log('╔══════════════════════════════════════════╗');
   console.log('║  🎓  趣味互動考試系統  已啟動             ║');
   console.log(`║  📍  Port ${PORT.toString().padEnd(31)}║`);
-  console.log(`║  🤖  AI: ${(process.env.ANTHROPIC_API_KEY ? '✅ 已啟用' : '⚠️  Fallback 模擬').padEnd(32)}║`);
+  console.log(`║  🤖  AI: ${(process.env.NVIDIA_API_KEY ? '✅ NVIDIA 已啟用' : '⚠️  Fallback 模擬').padEnd(28)}║`);
   console.log('╚══════════════════════════════════════════╝');
   console.log('');
   autoSeedIfEmpty();

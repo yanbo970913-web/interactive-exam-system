@@ -158,6 +158,11 @@ const App = {
   currentView: null,
 
   navigate(viewId, data = {}) {
+    // 離開即時監控頁面時斷開 SSE
+    if (this.currentView === 'live-progress' && viewId !== 'live-progress') {
+      if (typeof AdminLiveProgress !== 'undefined') AdminLiveProgress.leave();
+    }
+
     document.querySelectorAll('.view').forEach(v => {
       v.classList.add('hidden');
       v.classList.remove('active');
@@ -182,6 +187,7 @@ const App = {
       'admin-exams':       () => AdminExams.load(),
       'admin-users':       () => AdminUsers.load(),
       'admin-attempts':    () => AdminAttempts.load(),
+      'live-progress':     () => { if (typeof AdminLiveProgress !== 'undefined') AdminLiveProgress.enter(); },
     };
     if (handlers[viewId]) handlers[viewId](data);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -260,6 +266,7 @@ function setupNav() {
     { view: 'admin-exams',      icon: '🗓️', label: '考試管理' },
     { view: 'admin-users',      icon: '👥', label: '使用者' },
     { view: 'admin-attempts',   icon: '🔍', label: '錯題分析' },
+    { view: 'live-progress',    icon: '📡', label: '即時監控' },
   ];
   // 老師導覽（無科目管理）
   const teacherLinks = [
@@ -268,6 +275,7 @@ function setupNav() {
     { view: 'admin-exams',      icon: '🗓️', label: '考試管理' },
     { view: 'admin-users',      icon: '👥', label: '學生管理' },
     { view: 'admin-attempts',   icon: '🔍', label: '錯題分析' },
+    { view: 'live-progress',    icon: '📡', label: '即時監控' },
   ];
   // 學生導覽
   const studentLinks = [

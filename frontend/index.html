@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>趣味互動考試系統</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="stylesheet" href="/css/styles.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
@@ -305,6 +306,25 @@
         <div id="subjectsTable"></div>
       </section>
 
+      <!-- ─── 管理者：即時進度監控 ─────────────────── -->
+      <section id="view-live-progress" class="view hidden">
+        <div class="view-header">
+          <h2 class="view-title">📡 即時作答進度監控</h2>
+          <div class="view-actions">
+            <span id="liveConnectionBadge" class="live-badge live-badge-connecting">⏳ 連線中...</span>
+            <button class="btn-secondary-outline" onclick="AdminLiveProgress.refresh()">🔄 手動刷新</button>
+          </div>
+        </div>
+        <div id="liveStatsBar" class="live-stats-bar"></div>
+        <div id="liveProgressContainer" class="live-progress-container">
+          <div class="empty-state">
+            <div class="empty-state-icon">📡</div>
+            <h3>等待學生加入考試...</h3>
+            <p>當學生開始作答時，即時進度將自動出現在這裡</p>
+          </div>
+        </div>
+      </section>
+
       <!-- ─── 管理者：錯題分析 ──────────────────── -->
       <section id="view-admin-attempts" class="view hidden">
         <div class="view-header">
@@ -396,6 +416,7 @@
   <script src="/js/exam.js"></script>
   <script src="/js/results.js"></script>
   <script src="/js/admin.js"></script>
+  <script src="/js/live.js"></script>
   <script src="/js/practice.js"></script>
   <script src="/js/profile.js"></script>
 </body>
