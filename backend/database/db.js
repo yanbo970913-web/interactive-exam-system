@@ -141,4 +141,24 @@ try {
 // 遷移：新增 max_attempts 欄位（NULL = 無限次）
 try { db.exec('ALTER TABLE exams ADD COLUMN max_attempts INTEGER DEFAULT NULL'); } catch (_) {}
 
+// 一次性清理：刪除 Python 程式設計、數位邏輯 科目及其所有題目
+try {
+  const toRemove = ['Python 程式設計', '數位邏輯'];
+  for (const name of toRemove) {
+    const subj = db.prepare("SELECT id FROM subjects WHERE name = ?").get(name);
+    if (subj) {
+      db.exec('BEGIN');
+      try {
+        db.prepare('DELETE FROM questions WHERE subject_id = ?').run(subj.id);
+        db.prepare('DELETE FROM subjects  WHERE id = ?').run(subj.id);
+        db.exec('COMMIT');
+        console.log(`🗑️  已自動清除科目「${name}」及其所有題目`);
+      } catch (e) {
+        db.exec('ROLLBACK');
+        console.error(`清除科目「${name}」失敗:`, e.message);
+      }
+    }
+  }
+} catch (_) {}
+
 module.exports = db;
