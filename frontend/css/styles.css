@@ -1611,6 +1611,21 @@ button {
   font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;
 }
 
+/* ── 考試次數提示 */
+.exam-attempts-badge {
+  font-size: 0.78rem; padding: 5px 10px; border-radius: var(--radius-sm);
+  background: rgba(59,130,246,0.12); color: #93C5FD;
+  border: 1px solid rgba(59,130,246,0.2);
+  display: inline-block; margin-top: 4px;
+}
+.exam-attempts-badge.limit {
+  background: rgba(239,68,68,0.12); color: #FCA5A5;
+  border-color: rgba(239,68,68,0.2);
+}
+.status-limit {
+  background: rgba(239,68,68,0.2) !important; color: #FCA5A5 !important;
+}
+
 /* 結果頁 stat 卡片進場 */
 .result-stat-card {
   animation: statCardIn 0.5s cubic-bezier(0.34,1.56,0.64,1) both;

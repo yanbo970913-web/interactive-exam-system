@@ -38,16 +38,32 @@ const ExamsListModule = {
     const now = new Date();
     const start = exam.start_time ? new Date(exam.start_time) : null;
     const end   = exam.end_time   ? new Date(exam.end_time)   : null;
+
+    // 次數限制判斷
+    const maxAtt = exam.max_attempts != null ? Number(exam.max_attempts) : null;
+    const doneCount = Number(exam.my_attempt_count || 0);
+    const limitReached = maxAtt !== null && doneCount >= maxAtt;
+
     let status = 'open', statusLabel = '開放中';
     if (start && start > now)    { status = 'upcoming'; statusLabel = '尚未開始'; }
     else if (end && end < now)   { status = 'closed';   statusLabel = '已截止'; }
-    else if (exam.my_attempt_count > 0) { status = 'done'; statusLabel = '已作答'; }
+    else if (limitReached)       { status = 'limit';    statusLabel = '已達次數上限'; }
+    else if (doneCount > 0)      { status = 'done';     statusLabel = '已作答'; }
 
-    const canStart = status === 'open' || status === 'done';
+    const canStart = (status === 'open' || status === 'done') && !limitReached;
     const levelText = exam.level_filter === 'all' ? '全等級' : `Level ${exam.level_filter}`;
 
+    // 次數顯示
+    let attemptsHint = '';
+    if (maxAtt !== null) {
+      const remaining = maxAtt - doneCount;
+      attemptsHint = limitReached
+        ? `<div class="exam-attempts-badge limit">🚫 已用完 ${maxAtt} 次參加機會</div>`
+        : `<div class="exam-attempts-badge">🔁 剩餘次數：<strong>${remaining}</strong> / ${maxAtt}</div>`;
+    }
+
     return `
-      <div class="exam-card" onclick="${canStart ? `ExamModule.startExam(${exam.id})` : 'void(0)'}">
+      <div class="exam-card tilt-card" onclick="${canStart ? `ExamModule.startExam(${exam.id})` : 'void(0)'}">
         <div class="exam-card-header">
           <span class="exam-card-icon">${exam.subject_icon || '📚'}</span>
           <span class="exam-card-status status-${status}">${statusLabel}</span>
@@ -64,8 +80,9 @@ const ExamsListModule = {
         </div>
         ${exam.start_time ? `<div class="meta-tag" style="font-size:0.72rem">📅 ${formatDate(exam.start_time)} ~ ${formatDate(exam.end_time)}</div>` : ''}
         ${exam.my_best_score != null ? `<div class="exam-card-score">🏆 最高分：${exam.my_best_score} 分</div>` : ''}
-        <button class="btn-start-exam" ${!canStart ? 'disabled' : ''}>
-          ${status === 'done' ? '🔄 重新參加' : '▶ 開始作答'}
+        ${attemptsHint}
+        <button class="btn-start-exam" ${!canStart ? 'disabled style="opacity:0.5;cursor:not-allowed"' : ''}>
+          ${limitReached ? '🚫 次數已用完' : status === 'done' ? '🔄 再次作答' : '▶ 開始作答'}
         </button>
       </div>
     `;

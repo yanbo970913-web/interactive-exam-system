@@ -37,7 +37,7 @@ router.get('/stats/overview', requireStaff, (req, res) => {
 // GET /api/exams
 router.get('/', requireAuth, (req, res) => {
   const now = new Date().toISOString();
-  const isAdmin = req.user.role === 'admin';
+  const isAdmin = ['superadmin','teacher'].includes(req.user.role);
 
   let sql = `
     SELECT e.*,
@@ -59,7 +59,14 @@ router.get('/', requireAuth, (req, res) => {
   sql += ' ORDER BY e.created_at DESC';
 
   const exams = db.prepare(sql).all(...params);
-  res.json(exams);
+  res.json(exams.map(e => ({
+    ...e,
+    id: Number(e.id),
+    // 計算剩餘可作答次數
+    attempts_remaining: (e.max_attempts == null)
+      ? null
+      : Math.max(0, Number(e.max_attempts) - Number(e.my_attempt_count))
+  })));
 });
 
 // GET /api/exams/:id/leaderboard
@@ -110,18 +117,21 @@ router.post('/', requireStaff, (req, res) => {
   const {
     title, description, subject_id, level_filter = 'all',
     question_count = 10, start_time, end_time,
-    duration_minutes = 30, shuffle_questions = 1, shuffle_options = 1, passing_score = 60
+    duration_minutes = 30, shuffle_questions = 1, shuffle_options = 1,
+    passing_score = 60, max_attempts = null
   } = req.body;
 
   if (!title || !subject_id) return res.status(400).json({ error: '請填寫考試名稱與科目' });
 
   const result = db.prepare(`
     INSERT INTO exams (title,description,subject_id,level_filter,question_count,start_time,end_time,
-                       duration_minutes,shuffle_questions,shuffle_options,passing_score,created_by)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                       duration_minutes,shuffle_questions,shuffle_options,passing_score,max_attempts,created_by)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(title, description||null, subject_id, level_filter, question_count,
     start_time||null, end_time||null, duration_minutes,
-    shuffle_questions?1:0, shuffle_options?1:0, passing_score, req.user.id);
+    shuffle_questions?1:0, shuffle_options?1:0, passing_score,
+    max_attempts ? Number(max_attempts) : null,
+    req.user.id);
 
   res.status(201).json({ id: Number(result.lastInsertRowid), message: '考試建立成功' });
 });
@@ -132,7 +142,7 @@ router.put('/:id', requireStaff, (req, res) => {
   if (!exam) return res.status(404).json({ error: '找不到此考試' });
 
   const fields = ['title','description','subject_id','level_filter','question_count',
-    'start_time','end_time','duration_minutes','shuffle_questions','shuffle_options','passing_score','is_active'];
+    'start_time','end_time','duration_minutes','shuffle_questions','shuffle_options','passing_score','is_active','max_attempts'];
   const updates = [];
   const values = [];
   for (const f of fields) {
@@ -164,12 +174,26 @@ router.post('/:id/start', requireAuth, (req, res) => {
   if (!exam) return res.status(404).json({ error: '找不到此考試' });
 
   const now = new Date();
-  if (req.user.role !== 'admin') {
+  const isStaff = ['superadmin','teacher'].includes(req.user.role);
+  if (!isStaff) {
     if (!exam.is_active) return res.status(403).json({ error: '此考試目前不開放' });
     if (exam.start_time && new Date(exam.start_time) > now)
       return res.status(403).json({ error: '考試尚未開始' });
     if (exam.end_time && new Date(exam.end_time) < now)
       return res.status(403).json({ error: '考試已截止' });
+    // ── 最多參加次數限制 ──
+    if (exam.max_attempts != null) {
+      const doneCount = Number(db.prepare(
+        "SELECT COUNT(*) as c FROM exam_attempts WHERE exam_id=? AND user_id=? AND status='submitted'"
+      ).get(req.params.id, req.user.id).c);
+      if (doneCount >= Number(exam.max_attempts)) {
+        return res.status(403).json({
+          error: `此考試最多可參加 ${exam.max_attempts} 次，您已完成 ${doneCount} 次`,
+          max_attempts: Number(exam.max_attempts),
+          done_count: doneCount
+        });
+      }
+    }
   }
 
   // 進行中的作答

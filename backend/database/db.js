@@ -130,4 +130,7 @@ try { db.exec('ALTER TABLE users ADD COLUMN avatar_image TEXT'); } catch (_) {}
 // 遷移：舊 admin 角色升級為 superadmin（三層身份系統）
 try { db.exec("UPDATE users SET role='superadmin' WHERE role='admin'"); } catch (_) {}
 
+// 遷移：新增 max_attempts 欄位（NULL = 無限次）
+try { db.exec('ALTER TABLE exams ADD COLUMN max_attempts INTEGER DEFAULT NULL'); } catch (_) {}
+
 module.exports = db;

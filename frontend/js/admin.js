@@ -301,7 +301,7 @@ const AdminExams = {
         <div class="table-wrapper">
           <table class="data-table">
             <thead><tr>
-              <th>名稱</th><th>科目</th><th>題數/時長</th><th>開始時間</th><th>截止時間</th><th>狀態</th><th>操作</th>
+              <th>名稱</th><th>科目</th><th>題數/時長</th><th>次數上限</th><th>開始時間</th><th>截止時間</th><th>狀態</th><th>操作</th>
             </tr></thead>
             <tbody>
               ${this.exams.map(e => `
@@ -309,6 +309,11 @@ const AdminExams = {
                   <td><strong>${escapeHtml(e.title)}</strong></td>
                   <td>${e.subject_icon} ${escapeHtml(e.subject_name)}</td>
                   <td>${e.question_count}題 / ${e.duration_minutes}分</td>
+                  <td style="text-align:center">
+                    ${e.max_attempts != null
+                      ? `<span style="background:rgba(245,158,11,0.2);color:#FCD34D;padding:2px 8px;border-radius:99px;font-size:0.78rem">最多 ${e.max_attempts} 次</span>`
+                      : '<span style="color:#64748B;font-size:0.78rem">無限制</span>'}
+                  </td>
                   <td style="font-size:0.8rem">${formatDate(e.start_time)}</td>
                   <td style="font-size:0.8rem">${formatDate(e.end_time)}</td>
                   <td>${e.is_active ? '<span class="tag-active">開放</span>' : '<span class="tag-inactive">關閉</span>'}</td>
@@ -410,9 +415,17 @@ const AdminExams = {
             <input type="datetime-local" class="form-input" id="eEnd" value="${toLocalInput(e?.end_time)}" />
           </div>
         </div>
-        <div>
-          <label class="form-label">及格分數（%）</label>
-          <input type="number" class="form-input" id="ePassing" min="0" max="100" value="${e?.passing_score||60}" />
+        <div class="form-row">
+          <div>
+            <label class="form-label">及格分數（%）</label>
+            <input type="number" class="form-input" id="ePassing" min="0" max="100" value="${e?.passing_score||60}" />
+          </div>
+          <div>
+            <label class="form-label">最多參加次數（空白＝無限）</label>
+            <input type="number" class="form-input" id="eMaxAttempts" min="1" max="999"
+              value="${e?.max_attempts != null ? e.max_attempts : ''}"
+              placeholder="不限次數" />
+          </div>
         </div>
       </div>
     `, `
@@ -431,16 +444,23 @@ const AdminExams = {
     const start_time = document.getElementById('eStart').value || null;
     const end_time = document.getElementById('eEnd').value || null;
     const passing_score = parseInt(document.getElementById('ePassing').value);
+    const maxAttemptsRaw = document.getElementById('eMaxAttempts').value.trim();
+    const max_attempts = maxAttemptsRaw ? parseInt(maxAttemptsRaw) : null;
 
     if (!title) { Toast.warning('請填寫考試名稱'); return; }
     if (start_time && end_time && new Date(start_time) >= new Date(end_time)) {
       Toast.warning('截止時間必須晚於開始時間'); return;
     }
+    if (max_attempts !== null && (isNaN(max_attempts) || max_attempts < 1)) {
+      Toast.warning('最多參加次數必須為正整數'); return;
+    }
 
     const toISO = (val) => val ? new Date(val).toISOString() : null;
 
     try {
-      const data = { title, description: desc, subject_id, level_filter, question_count, duration_minutes, start_time: toISO(start_time), end_time: toISO(end_time), passing_score };
+      const data = { title, description: desc, subject_id, level_filter, question_count,
+        duration_minutes, start_time: toISO(start_time), end_time: toISO(end_time),
+        passing_score, max_attempts };
       if (editId) {
         await API.exams.update(editId, data);
         Toast.success('考試更新成功');
