@@ -150,18 +150,45 @@ router.patch('/subjects/:id/toggle', requireSuperAdmin, (req, res) => {
 });
 
 // DELETE /api/admin/subjects/:id — 刪除科目
+// ?cascade=true 時連同該科目下的所有題目一起刪除（不可恢復）
 router.delete('/subjects/:id', requireSuperAdmin, (req, res) => {
-  const s = db.prepare('SELECT id FROM subjects WHERE id = ?').get(req.params.id);
+  const s = db.prepare('SELECT id, name FROM subjects WHERE id = ?').get(req.params.id);
   if (!s) return res.status(404).json({ error: '找不到此科目' });
+
   const qCount = Number(db.prepare('SELECT COUNT(*) as c FROM questions WHERE subject_id = ?').get(req.params.id).c);
   const eCount = Number(db.prepare('SELECT COUNT(*) as c FROM exams    WHERE subject_id = ?').get(req.params.id).c);
-  if (qCount > 0 || eCount > 0) {
+
+  // 有考試時一律拒絕（考試資料太重要）
+  if (eCount > 0) {
     return res.status(409).json({
-      error: `此科目尚有 ${qCount} 題題目、${eCount} 場考試，請先刪除後再移除科目。`
+      error: `此科目仍有 ${eCount} 場考試，請先至「考試管理」刪除後再移除科目。`
     });
   }
-  db.prepare('DELETE FROM subjects WHERE id = ?').run(req.params.id);
-  res.json({ message: '科目已刪除' });
+
+  const cascade = req.query.cascade === 'true';
+
+  if (qCount > 0 && !cascade) {
+    // 告知前端有題目，讓前端再次確認是否 cascade
+    return res.status(409).json({
+      error: `此科目尚有 ${qCount} 題題目。`,
+      question_count: qCount,
+      can_cascade: true
+    });
+  }
+
+  // cascade 刪除：先清題目，再刪科目（使用交易確保原子性）
+  db.exec('BEGIN');
+  try {
+    if (qCount > 0) {
+      db.prepare('DELETE FROM questions WHERE subject_id = ?').run(req.params.id);
+    }
+    db.prepare('DELETE FROM subjects WHERE id = ?').run(req.params.id);
+    db.exec('COMMIT');
+    res.json({ message: `科目「${s.name}」及 ${qCount} 題題目已全部刪除` });
+  } catch (err) {
+    db.exec('ROLLBACK');
+    res.status(500).json({ error: '刪除失敗：' + err.message });
+  }
 });
 
 // GET /api/admin/students — 所有學生的成績摘要

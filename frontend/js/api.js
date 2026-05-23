@@ -88,7 +88,7 @@ const API = (() => {
       createSubject: (data)       => request('POST',   '/admin/subjects', data),
       updateSubject: (id, data)   => request('PUT',    `/admin/subjects/${id}`, data),
       toggleSubject: (id)         => request('PATCH',  `/admin/subjects/${id}/toggle`),
-      deleteSubject: (id)         => request('DELETE', `/admin/subjects/${id}`),
+      deleteSubject: (id, cascade) => request('DELETE', `/admin/subjects/${id}${cascade ? '?cascade=true' : ''}`),
     },
     // 即時進度
     live: {

@@ -104,12 +104,12 @@ const AdminQuestions = {
         <div class="table-wrapper">
           <table class="data-table">
             <thead><tr>
-              <th>ID</th><th>科目</th><th>等級</th><th>題型</th><th>題目（前40字）</th><th>狀態</th><th>操作</th>
+              <th style="width:50px">#</th><th>科目</th><th>等級</th><th>題型</th><th>題目（前40字）</th><th>狀態</th><th>操作</th>
             </tr></thead>
             <tbody>
-              ${this.questions.map(q => `
+              ${this.questions.map((q, idx) => `
                 <tr>
-                  <td>${q.id}</td>
+                  <td style="text-align:center;color:#64748B;font-size:0.82rem">${idx + 1}</td>
                   <td>${escapeHtml(q.subject_name)}</td>
                   <td>Lv.${q.level}</td>
                   <td>${q.type === 'choice' ? '<span class="tag-type-choice">選擇題</span>' : '<span class="tag-type-fill">填充題</span>'}</td>
@@ -760,31 +760,46 @@ const AdminSubjects = {
   confirmDelete(id) {
     const s = this.subjects.find(s => s.id === id);
     if (!s) return;
-    if (Number(s.question_count) > 0 || Number(s.exam_count) > 0) {
+
+    // 有考試 → 一定不能刪
+    if (Number(s.exam_count) > 0) {
       Modal.open('無法刪除科目', `
-        <p style="color:#FCA5A5;margin-bottom:12px">⚠️ 此科目仍有關聯資料，無法直接刪除：</p>
-        <ul style="color:#CBD5E1;font-size:0.9rem;margin-left:16px;line-height:2">
-          ${Number(s.question_count) > 0 ? `<li>📝 題目：<strong style="color:#FCD34D">${s.question_count}</strong> 題</li>` : ''}
-          ${Number(s.exam_count) > 0    ? `<li>🗓️ 考試：<strong style="color:#FCD34D">${s.exam_count}</strong> 場</li>` : ''}
-        </ul>
-        <p style="margin-top:12px;font-size:0.85rem;color:#94A3B8">請先在題庫管理、考試管理中刪除相關資料後再刪除科目。</p>
+        <p style="color:#FCA5A5;margin-bottom:12px">⚠️ 此科目仍有 <strong>${s.exam_count}</strong> 場考試關聯。</p>
+        <p style="font-size:0.85rem;color:#94A3B8">請先至「考試管理」刪除相關考試後再移除科目。</p>
       `, `<button class="btn-modal-cancel" onclick="Modal.close()">了解</button>`);
       return;
     }
+
+    // 有題目 → 詢問是否一併刪除
+    if (Number(s.question_count) > 0) {
+      Modal.open('⚠️ 確認強制刪除科目', `
+        <p style="color:#FCA5A5;margin-bottom:12px">此科目包含 <strong style="color:#FCD34D">${s.question_count}</strong> 題題目。</p>
+        <p style="margin-bottom:16px">選擇「連同題目一起刪除」將<strong>永久移除</strong>科目及其所有題目，此操作<strong style="color:#FCA5A5">無法復原</strong>！</p>
+        <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:12px;font-size:0.85rem;color:#FCA5A5">
+          🗑️ 即將刪除：科目「${escapeHtml(s.name)}」+ ${s.question_count} 題題目
+        </div>
+      `, `
+        <button class="btn-modal-cancel" onclick="Modal.close()">取消</button>
+        <button class="btn-modal-delete" onclick="AdminSubjects.doDelete(${id}, true)">🗑️ 連同題目一起刪除</button>
+      `);
+      return;
+    }
+
+    // 無題目無考試 → 直接刪
     Modal.open('確認刪除科目', `
       <p style="color:#FCA5A5;margin-bottom:8px">⚠️ 此操作無法復原！</p>
       <p>確定要刪除科目「<strong>${escapeHtml(s.name)}</strong>」嗎？</p>
     `, `
       <button class="btn-modal-cancel" onclick="Modal.close()">取消</button>
-      <button class="btn-modal-delete" onclick="AdminSubjects.doDelete(${id})">確認刪除</button>
+      <button class="btn-modal-delete" onclick="AdminSubjects.doDelete(${id}, false)">確認刪除</button>
     `);
   },
 
-  async doDelete(id) {
+  async doDelete(id, cascade = false) {
     try {
-      await API.admin.deleteSubject(id);
+      const res = await API.admin.deleteSubject(id, cascade);
       Modal.close();
-      Toast.success('科目已刪除');
+      Toast.success(res.message);
       await this.load();
       await loadSubjects();
     } catch (err) {
