@@ -20,11 +20,14 @@ router.post('/login', (req, res) => {
   const valid = bcrypt.compareSync(password, user.password_hash);
   if (!valid) return res.status(401).json({ error: '帳號或密碼錯誤' });
 
+  // 正規化：舊 'admin' 角色統一為 'superadmin'
+  const normalizedRole = user.role === 'admin' ? 'superadmin' : user.role;
+
   const payload = {
-    id: Number(user.id),
-    username: user.username,
+    id:           Number(user.id),
+    username:     user.username,
     display_name: user.display_name,
-    role: user.role,
+    role:         normalizedRole,
     avatar_color: user.avatar_color
   };
 
@@ -76,13 +79,15 @@ router.post('/update-profile', requireAuth, (req, res) => {
   res.json({ message: '個人資料更新成功', display_name: display_name.trim() });
 });
 
-// GET /api/auth/me
+// GET /api/auth/me — 每次從 DB 取最新資料（角色變更立即生效）
 router.get('/me', requireAuth, (req, res) => {
   const user = db.prepare(
     'SELECT id, username, display_name, role, avatar_color, avatar_image, created_at FROM users WHERE id = ?'
   ).get(req.user.id);
   if (!user) return res.status(404).json({ error: '找不到使用者' });
-  res.json({ ...user, id: Number(user.id) });
+  // 正規化 admin → superadmin
+  const normalizedRole = user.role === 'admin' ? 'superadmin' : user.role;
+  res.json({ ...user, id: Number(user.id), role: normalizedRole });
 });
 
 module.exports = router;

@@ -2,12 +2,19 @@ const jwt = require('jsonwebtoken');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_dev_secret_change_in_production_32chars';
 
+/** 將舊 'admin' 角色正規化為 'superadmin'（向後相容） */
+function normalizeRole(role) {
+  return role === 'admin' ? 'superadmin' : role;
+}
+
 function requireAuth(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
   if (!token) return res.status(401).json({ error: '未授權：缺少身分驗證令牌' });
   try {
-    req.user = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET);
+    decoded.role = normalizeRole(decoded.role); // 正規化角色
+    req.user = decoded;
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError')
@@ -16,7 +23,7 @@ function requireAuth(req, res, next) {
   }
 }
 
-/** 僅最高管理員 */
+/** 僅最高管理員（superadmin） */
 function requireSuperAdmin(req, res, next) {
   requireAuth(req, res, () => {
     if (req.user.role !== 'superadmin')
@@ -34,7 +41,7 @@ function requireStaff(req, res, next) {
   });
 }
 
-/** 向下相容舊程式碼：等同 requireSuperAdmin */
+/** 向下相容舊程式碼 */
 const requireAdmin = requireSuperAdmin;
 
 module.exports = { requireAuth, requireSuperAdmin, requireStaff, requireAdmin, JWT_SECRET };

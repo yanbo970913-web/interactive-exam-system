@@ -59,6 +59,9 @@ router.post('/', requireStaff, (req, res) => {
 router.put('/:id', requireStaff, (req, res) => {
   const target = db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id);
   if (!target) return res.status(404).json({ error: '找不到此使用者' });
+  // superadmin 只能自己改自己的顯示名稱/密碼，不能被他人修改角色
+  if (target.role === 'superadmin' && req.user.id !== Number(target.id))
+    return res.status(403).json({ error: '不能修改最高管理員帳號' });
   if (!canManage(req.user.role, target.role))
     return res.status(403).json({ error: '權限不足：無法修改此帳號' });
 
@@ -87,7 +90,11 @@ router.put('/:id', requireStaff, (req, res) => {
 router.delete('/:id', requireStaff, (req, res) => {
   const target = db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id);
   if (!target) return res.status(404).json({ error: '找不到此使用者' });
-  if (target.role === 'superadmin') return res.status(403).json({ error: '不能刪除最高管理員帳號' });
+  // superadmin 帳號絕對不可刪除（雙重保護：角色 + 環境變數帳號）
+  if (target.role === 'superadmin')
+    return res.status(403).json({ error: '不能刪除最高管理員帳號' });
+  if (process.env.ADMIN_USERNAME && target.username === process.env.ADMIN_USERNAME)
+    return res.status(403).json({ error: '不能刪除系統主要管理員帳號' });
   if (!canManage(req.user.role, target.role))
     return res.status(403).json({ error: '權限不足：無法刪除此帳號' });
   db.prepare('DELETE FROM users WHERE id=?').run(req.params.id);
