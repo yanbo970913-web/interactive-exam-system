@@ -12,6 +12,12 @@ const dbPath = process.env.DB_PATH
   ? path.resolve(process.env.DB_PATH)
   : path.join(dbDir, 'exam_system.db');
 
+// 確保自訂 DB_PATH 的上層目錄存在（Railway Volume 掛載時必要）
+const dbPathDir = path.dirname(dbPath);
+if (!fs.existsSync(dbPathDir)) {
+  fs.mkdirSync(dbPathDir, { recursive: true });
+}
+
 const db = new DatabaseSync(dbPath);
 
 // 等效 better-sqlite3 的 pragma 呼叫
