@@ -3,10 +3,31 @@
  */
 const ResultsModule = {
   async show(result, questions, subjectName) {
+    const { score, correct_count, total_questions, time_spent_seconds, passed, results } = result;
+
+    // ── 先填充 mini-stats（動畫 Phase 5 會顯示）──
+    const miniStats = document.getElementById('resultsMiniStats');
+    if (miniStats) {
+      miniStats.innerHTML = `
+        <div class="result-mini-card">
+          <div class="mini-val">${correct_count}/${total_questions}</div>
+          <div class="mini-label">答對題數</div>
+        </div>
+        <div class="result-mini-card">
+          <div class="mini-val">${formatDuration(time_spent_seconds)}</div>
+          <div class="mini-label">用時</div>
+        </div>
+        <div class="result-mini-card">
+          <div class="mini-val">${score >= 60 ? '✅' : '❌'}</div>
+          <div class="mini-label">${passed ? '通過' : '未通過'}</div>
+        </div>
+      `;
+    }
+
+    // ── 先渲染結果頁（隱藏狀態），動畫結束後顯示 ──
     App.navigate('results');
     const container = document.getElementById('resultsContainer');
 
-    const { score, correct_count, total_questions, time_spent_seconds, passed, results } = result;
     const scoreColor = score >= 90 ? '#10B981' : score >= 60 ? '#3B82F6' : '#EF4444';
     const emoji = score >= 90 ? '🏆' : score >= 60 ? '👏' : '💪';
     const titleMsg = score >= 90 ? '太厲害了！滿分達人！' : score >= 60 ? '恭喜通過！繼續加油！' : '繼續努力，下次會更好！';
@@ -71,12 +92,18 @@ const ResultsModule = {
       </div>
     `;
 
-    // 分數動畫
-    this.animateScore(0, score, 1200);
-
-    // 通過時撒彩帶
-    if (passed && typeof launchConfetti === 'function') {
-      setTimeout(() => launchConfetti(score >= 90 ? 4000 : 2800), 600);
+    // ── 觸發 12 秒成績動畫，結束後再做分數計數 ──
+    if (typeof ResultsAnimation !== 'undefined') {
+      ResultsAnimation.show(score, passed, () => {
+        // 動畫結束後執行分數數字滾動
+        this.animateScore(0, score, 1200);
+      });
+    } else {
+      // fallback：直接執行
+      this.animateScore(0, score, 1200);
+      if (passed && typeof launchConfetti === 'function') {
+        setTimeout(() => launchConfetti(score >= 90 ? 4000 : 2800), 600);
+      }
     }
   },
 
