@@ -1,6 +1,6 @@
 const express = require('express');
 const db = require('../database/db');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireStaff } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -43,14 +43,14 @@ router.get('/', requireAuth, (req, res) => {
 });
 
 // GET /api/questions/:id
-router.get('/:id', requireAdmin, (req, res) => {
+router.get('/:id', requireStaff, (req, res) => {
   const q = db.prepare('SELECT * FROM questions WHERE id = ?').get(req.params.id);
   if (!q) return res.status(404).json({ error: '找不到此題目' });
   res.json(q);
 });
 
 // POST /api/questions
-router.post('/', requireAdmin, (req, res) => {
+router.post('/', requireStaff, (req, res) => {
   const { subject_id, level, type, question_text, options, correct_answer, explanation } = req.body;
   if (!subject_id || !level || !type || !question_text || !correct_answer) {
     return res.status(400).json({ error: '缺少必填欄位' });
@@ -68,7 +68,7 @@ router.post('/', requireAdmin, (req, res) => {
 });
 
 // PUT /api/questions/:id
-router.put('/:id', requireAdmin, (req, res) => {
+router.put('/:id', requireStaff, (req, res) => {
   const q = db.prepare('SELECT * FROM questions WHERE id = ?').get(req.params.id);
   if (!q) return res.status(404).json({ error: '找不到此題目' });
 
@@ -92,7 +92,7 @@ router.put('/:id', requireAdmin, (req, res) => {
 });
 
 // DELETE /api/questions/:id
-router.delete('/:id', requireAdmin, (req, res) => {
+router.delete('/:id', requireStaff, (req, res) => {
   const q = db.prepare('SELECT id FROM questions WHERE id = ?').get(req.params.id);
   if (!q) return res.status(404).json({ error: '找不到此題目' });
   db.prepare('DELETE FROM questions WHERE id = ?').run(req.params.id);
@@ -100,7 +100,7 @@ router.delete('/:id', requireAdmin, (req, res) => {
 });
 
 // PATCH /api/questions/:id/toggle
-router.patch('/:id/toggle', requireAdmin, (req, res) => {
+router.patch('/:id/toggle', requireStaff, (req, res) => {
   const q = db.prepare('SELECT * FROM questions WHERE id = ?').get(req.params.id);
   if (!q) return res.status(404).json({ error: '找不到此題目' });
   const newStatus = q.is_active ? 0 : 1;

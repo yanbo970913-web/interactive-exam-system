@@ -233,7 +233,7 @@ function showAppPage() {
   document.getElementById('page-login').classList.add('hidden');
   document.getElementById('page-app').classList.remove('hidden');
   setupNav();
-  if (AppState.user.role === 'admin') {
+  if (['superadmin', 'teacher'].includes(AppState.user.role)) {
     App.navigate('admin-dashboard');
   } else {
     App.navigate('exams');
@@ -247,22 +247,38 @@ async function loadSubjects() {
 
 function setupNav() {
   const user = AppState.user;
-  const isAdmin = user.role === 'admin';
+  const role = user.role;
+  const isStaff = ['superadmin', 'teacher'].includes(role);
   const navLinks = document.getElementById('navLinks');
   const mobileMenu = document.getElementById('mobileMenu');
 
-  const links = isAdmin ? [
+  // 最高管理員導覽
+  const superAdminLinks = [
     { view: 'admin-dashboard',  icon: '📊', label: '總覽' },
     { view: 'admin-subjects',   icon: '📂', label: '科目管理' },
     { view: 'admin-questions',  icon: '📝', label: '題庫管理' },
     { view: 'admin-exams',      icon: '🗓️', label: '考試管理' },
     { view: 'admin-users',      icon: '👥', label: '使用者' },
     { view: 'admin-attempts',   icon: '🔍', label: '錯題分析' },
-  ] : [
+  ];
+  // 老師導覽（無科目管理）
+  const teacherLinks = [
+    { view: 'admin-dashboard',  icon: '📊', label: '總覽' },
+    { view: 'admin-questions',  icon: '📝', label: '題庫管理' },
+    { view: 'admin-exams',      icon: '🗓️', label: '考試管理' },
+    { view: 'admin-users',      icon: '👥', label: '學生管理' },
+    { view: 'admin-attempts',   icon: '🔍', label: '錯題分析' },
+  ];
+  // 學生導覽
+  const studentLinks = [
     { view: 'exams',    icon: '📋', label: '考試列表' },
     { view: 'practice', icon: '⚡', label: '快速練習' },
     { view: 'profile',  icon: '👤', label: '個人設定' },
   ];
+
+  const links = role === 'superadmin' ? superAdminLinks
+              : role === 'teacher'    ? teacherLinks
+              : studentLinks;
 
   const linkHTML = links.map(l =>
     `<button class="nav-link" data-view="${l.view}" onclick="App.navigate('${l.view}')">${l.icon} ${l.label}</button>`

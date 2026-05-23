@@ -1,6 +1,6 @@
 const express = require('express');
 const db = require('../database/db');
-const { requireAuth, requireAdmin } = require('../middleware/auth');
+const { requireAuth, requireStaff } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -14,7 +14,7 @@ function shuffleArray(arr) {
 }
 
 // GET /api/exams/stats/overview — 必須在 /:id 之前
-router.get('/stats/overview', requireAdmin, (req, res) => {
+router.get('/stats/overview', requireStaff, (req, res) => {
   const stats = {
     total_users:    Number(db.prepare("SELECT COUNT(*) as c FROM users WHERE role='student'").get().c),
     total_exams:    Number(db.prepare('SELECT COUNT(*) as c FROM exams').get().c),
@@ -106,7 +106,7 @@ router.get('/:id', requireAuth, (req, res) => {
 });
 
 // POST /api/exams
-router.post('/', requireAdmin, (req, res) => {
+router.post('/', requireStaff, (req, res) => {
   const {
     title, description, subject_id, level_filter = 'all',
     question_count = 10, start_time, end_time,
@@ -127,7 +127,7 @@ router.post('/', requireAdmin, (req, res) => {
 });
 
 // PUT /api/exams/:id
-router.put('/:id', requireAdmin, (req, res) => {
+router.put('/:id', requireStaff, (req, res) => {
   const exam = db.prepare('SELECT * FROM exams WHERE id=?').get(req.params.id);
   if (!exam) return res.status(404).json({ error: '找不到此考試' });
 
@@ -145,7 +145,7 @@ router.put('/:id', requireAdmin, (req, res) => {
 });
 
 // DELETE /api/exams/:id
-router.delete('/:id', requireAdmin, (req, res) => {
+router.delete('/:id', requireStaff, (req, res) => {
   if (!db.prepare('SELECT id FROM exams WHERE id=?').get(req.params.id))
     return res.status(404).json({ error: '找不到此考試' });
   db.prepare('DELETE FROM exam_attempts WHERE exam_id=?').run(req.params.id);

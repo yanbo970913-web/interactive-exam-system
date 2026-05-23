@@ -43,7 +43,7 @@ function runSeed() {
   const adminResult = insertUser.run(
     adminUsername, adminPasswordHash,
     process.env.ADMIN_DISPLAY_NAME || '系統管理員',
-    'admin', '#7C3AED'
+    'superadmin', '#7C3AED'
   );
   const adminId = Number(adminResult.lastInsertRowid);
   console.log(`  ✅ 管理者帳號建立完成（帳號：${adminUsername}）`);

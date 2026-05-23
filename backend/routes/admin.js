@@ -1,11 +1,11 @@
 const express = require('express');
 const db = require('../database/db');
-const { requireAdmin } = require('../middleware/auth');
+const { requireSuperAdmin, requireStaff } = require('../middleware/auth');
 
 const router = express.Router();
 
 // GET /api/admin/attempts — 所有已提交作答記錄（含學生資訊）
-router.get('/attempts', requireAdmin, (req, res) => {
+router.get('/attempts', requireStaff, (req, res) => {
   const { user_id, exam_id, page = 1, limit = 50 } = req.query;
   const conditions = ["ea.status = 'submitted'"];
   const params = [];
@@ -43,7 +43,7 @@ router.get('/attempts', requireAdmin, (req, res) => {
 });
 
 // GET /api/admin/attempts/:id — 單次作答的完整錯題詳情
-router.get('/attempts/:id', requireAdmin, (req, res) => {
+router.get('/attempts/:id', requireStaff, (req, res) => {
   const attempt = db.prepare(`
     SELECT ea.*,
            u.display_name, u.avatar_color, u.avatar_image, u.username, u.id as uid,
@@ -108,7 +108,7 @@ router.get('/attempts/:id', requireAdmin, (req, res) => {
 // ── 科目管理 ────────────────────────────────────────────────
 
 // GET /api/admin/subjects — 所有科目（含停用）
-router.get('/subjects', requireAdmin, (req, res) => {
+router.get('/subjects', requireSuperAdmin, (req, res) => {
   const subjects = db.prepare(`
     SELECT s.*,
       (SELECT COUNT(*) FROM questions q WHERE q.subject_id = s.id) as question_count,
@@ -119,7 +119,7 @@ router.get('/subjects', requireAdmin, (req, res) => {
 });
 
 // POST /api/admin/subjects — 新增科目
-router.post('/subjects', requireAdmin, (req, res) => {
+router.post('/subjects', requireSuperAdmin, (req, res) => {
   const { name, name_en, description, icon } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: '科目名稱為必填' });
   const result = db.prepare(
@@ -129,7 +129,7 @@ router.post('/subjects', requireAdmin, (req, res) => {
 });
 
 // PUT /api/admin/subjects/:id — 更新科目
-router.put('/subjects/:id', requireAdmin, (req, res) => {
+router.put('/subjects/:id', requireSuperAdmin, (req, res) => {
   const s = db.prepare('SELECT id FROM subjects WHERE id = ?').get(req.params.id);
   if (!s) return res.status(404).json({ error: '找不到此科目' });
   const { name, name_en, description, icon } = req.body;
@@ -141,7 +141,7 @@ router.put('/subjects/:id', requireAdmin, (req, res) => {
 });
 
 // PATCH /api/admin/subjects/:id/toggle — 啟用/停用科目
-router.patch('/subjects/:id/toggle', requireAdmin, (req, res) => {
+router.patch('/subjects/:id/toggle', requireSuperAdmin, (req, res) => {
   const s = db.prepare('SELECT id, is_active FROM subjects WHERE id = ?').get(req.params.id);
   if (!s) return res.status(404).json({ error: '找不到此科目' });
   const newStatus = s.is_active ? 0 : 1;
@@ -150,7 +150,7 @@ router.patch('/subjects/:id/toggle', requireAdmin, (req, res) => {
 });
 
 // DELETE /api/admin/subjects/:id — 刪除科目
-router.delete('/subjects/:id', requireAdmin, (req, res) => {
+router.delete('/subjects/:id', requireSuperAdmin, (req, res) => {
   const s = db.prepare('SELECT id FROM subjects WHERE id = ?').get(req.params.id);
   if (!s) return res.status(404).json({ error: '找不到此科目' });
   const qCount = Number(db.prepare('SELECT COUNT(*) as c FROM questions WHERE subject_id = ?').get(req.params.id).c);
@@ -165,7 +165,7 @@ router.delete('/subjects/:id', requireAdmin, (req, res) => {
 });
 
 // GET /api/admin/students — 所有學生的成績摘要
-router.get('/students', requireAdmin, (req, res) => {
+router.get('/students', requireStaff, (req, res) => {
   const students = db.prepare(`
     SELECT u.id, u.username, u.display_name, u.avatar_color, u.avatar_image,
            COUNT(ea.id) as attempt_count,

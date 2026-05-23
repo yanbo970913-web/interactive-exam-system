@@ -125,8 +125,9 @@ function initSchema() {
 initSchema();
 
 // 遷移：若舊資料庫缺少 avatar_image 欄位則新增
-try {
-  db.exec('ALTER TABLE users ADD COLUMN avatar_image TEXT');
-} catch (_) { /* 欄位已存在，忽略 */ }
+try { db.exec('ALTER TABLE users ADD COLUMN avatar_image TEXT'); } catch (_) {}
+
+// 遷移：舊 admin 角色升級為 superadmin（三層身份系統）
+try { db.exec("UPDATE users SET role='superadmin' WHERE role='admin'"); } catch (_) {}
 
 module.exports = db;

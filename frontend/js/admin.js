@@ -480,11 +480,15 @@ const AdminUsers = {
                       ${escapeHtml(u.display_name)}
                     </span>
                   </td>
-                  <td>${u.role === 'admin' ? '<span class="tag-active">管理者</span>' : '<span class="tag-type-fill">學生</span>'}</td>
+                  <td>${
+                    u.role === 'superadmin' ? '<span class="tag-active" style="background:#7C3AED20;color:#A78BFA;border-color:#7C3AED">👑 最高管理員</span>' :
+                    u.role === 'teacher'    ? '<span class="tag-active" style="background:#065F4620;color:#34D399;border-color:#059669">🎓 老師</span>' :
+                                             '<span class="tag-type-fill">學生</span>'
+                  }</td>
                   <td style="font-size:0.8rem">${formatDate(u.created_at)}</td>
                   <td>
                     <button class="btn-tbl-edit" onclick="AdminUsers.openEditModal(${u.id})">✏️ 編輯</button>
-                    ${u.username !== 'wesley970913' ? `<button class="btn-tbl-delete" onclick="AdminUsers.confirmDelete(${u.id})">🗑️ 刪除</button>` : '<span style="font-size:0.75rem;color:#64748B">（主管理者）</span>'}
+                    ${u.role !== 'superadmin' ? `<button class="btn-tbl-delete" onclick="AdminUsers.confirmDelete(${u.id})">🗑️ 刪除</button>` : '<span style="font-size:0.75rem;color:#64748B">（主管理者）</span>'}
                   </td>
                 </tr>
               `).join('')}
@@ -498,6 +502,10 @@ const AdminUsers = {
   },
 
   openAddModal() {
+    const isSuperAdmin = AppState.user.role === 'superadmin';
+    const roleOptions = isSuperAdmin
+      ? `<option value="student">學生</option><option value="teacher">老師</option>`
+      : `<option value="student">學生</option>`;
     Modal.open('新增使用者', `
       <div class="modal-form">
         <div class="form-row">
@@ -517,10 +525,7 @@ const AdminUsers = {
           </div>
           <div>
             <label class="form-label">身分</label>
-            <select class="form-select" id="uRole">
-              <option value="student">學生</option>
-              <option value="admin">管理者</option>
-            </select>
+            <select class="form-select" id="uRole">${roleOptions}</select>
           </div>
         </div>
       </div>
@@ -533,6 +538,17 @@ const AdminUsers = {
   openEditModal(id) {
     const u = this.users.find(u => u.id === id);
     if (!u) return;
+    const isSuperAdmin = AppState.user.role === 'superadmin';
+    // 只有 superadmin 且目標非 superadmin 才能改角色
+    const canChangeRole = isSuperAdmin && u.role !== 'superadmin';
+    const roleSection = canChangeRole ? `
+      <div>
+        <label class="form-label">身分</label>
+        <select class="form-select" id="uEditRole">
+          <option value="student" ${u.role==='student'?'selected':''}>學生</option>
+          <option value="teacher" ${u.role==='teacher'?'selected':''}>老師</option>
+        </select>
+      </div>` : '';
     Modal.open('編輯使用者', `
       <div class="modal-form">
         <p style="color:#94A3B8;font-size:0.85rem">帳號：<strong>${escapeHtml(u.username)}</strong></p>
@@ -540,6 +556,7 @@ const AdminUsers = {
           <label class="form-label">顯示名稱</label>
           <input type="text" class="form-input" id="uEditName" value="${escapeHtml(u.display_name)}" />
         </div>
+        ${roleSection}
         <div>
           <label class="form-label">重設密碼（留空不更改）</label>
           <input type="password" class="form-input" id="uEditPwd" placeholder="留空則不更改密碼" />
@@ -568,9 +585,11 @@ const AdminUsers = {
   async updateUser(id) {
     const display_name = document.getElementById('uEditName').value.trim();
     const new_password = document.getElementById('uEditPwd').value;
+    const roleEl = document.getElementById('uEditRole');
     const data = {};
     if (display_name) data.display_name = display_name;
     if (new_password) data.new_password = new_password;
+    if (roleEl) data.role = roleEl.value;
     try {
       await API.users.update(id, data);
       Toast.success('使用者更新成功');
