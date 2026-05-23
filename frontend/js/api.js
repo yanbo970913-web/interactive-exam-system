@@ -83,6 +83,12 @@ const API = (() => {
       },
       attemptDetail: (id) => request('GET', `/admin/attempts/${id}`),
       students:      ()   => request('GET', '/admin/students'),
+      // 科目管理
+      subjects:      ()           => request('GET',    '/admin/subjects'),
+      createSubject: (data)       => request('POST',   '/admin/subjects', data),
+      updateSubject: (id, data)   => request('PUT',    `/admin/subjects/${id}`, data),
+      toggleSubject: (id)         => request('PATCH',  `/admin/subjects/${id}/toggle`),
+      deleteSubject: (id)         => request('DELETE', `/admin/subjects/${id}`),
     },
     // 健康
     health: () => request('GET', '/health'),

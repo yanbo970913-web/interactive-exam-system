@@ -105,6 +105,65 @@ router.get('/attempts/:id', requireAdmin, (req, res) => {
   });
 });
 
+// ── 科目管理 ────────────────────────────────────────────────
+
+// GET /api/admin/subjects — 所有科目（含停用）
+router.get('/subjects', requireAdmin, (req, res) => {
+  const subjects = db.prepare(`
+    SELECT s.*,
+      (SELECT COUNT(*) FROM questions q WHERE q.subject_id = s.id) as question_count,
+      (SELECT COUNT(*) FROM exams    e WHERE e.subject_id = s.id) as exam_count
+    FROM subjects s ORDER BY s.id
+  `).all();
+  res.json(subjects.map(s => ({ ...s, id: Number(s.id) })));
+});
+
+// POST /api/admin/subjects — 新增科目
+router.post('/subjects', requireAdmin, (req, res) => {
+  const { name, name_en, description, icon } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: '科目名稱為必填' });
+  const result = db.prepare(
+    'INSERT INTO subjects (name, name_en, description, icon) VALUES (?, ?, ?, ?)'
+  ).run(name.trim(), name_en?.trim() || null, description?.trim() || null, icon?.trim() || '📚');
+  res.status(201).json({ id: Number(result.lastInsertRowid), message: '科目新增成功' });
+});
+
+// PUT /api/admin/subjects/:id — 更新科目
+router.put('/subjects/:id', requireAdmin, (req, res) => {
+  const s = db.prepare('SELECT id FROM subjects WHERE id = ?').get(req.params.id);
+  if (!s) return res.status(404).json({ error: '找不到此科目' });
+  const { name, name_en, description, icon } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: '科目名稱為必填' });
+  db.prepare(
+    'UPDATE subjects SET name=?, name_en=?, description=?, icon=? WHERE id=?'
+  ).run(name.trim(), name_en?.trim() || null, description?.trim() || null, icon?.trim() || '📚', req.params.id);
+  res.json({ message: '科目更新成功' });
+});
+
+// PATCH /api/admin/subjects/:id/toggle — 啟用/停用科目
+router.patch('/subjects/:id/toggle', requireAdmin, (req, res) => {
+  const s = db.prepare('SELECT id, is_active FROM subjects WHERE id = ?').get(req.params.id);
+  if (!s) return res.status(404).json({ error: '找不到此科目' });
+  const newStatus = s.is_active ? 0 : 1;
+  db.prepare('UPDATE subjects SET is_active = ? WHERE id = ?').run(newStatus, req.params.id);
+  res.json({ message: newStatus ? '科目已啟用' : '科目已停用', is_active: newStatus });
+});
+
+// DELETE /api/admin/subjects/:id — 刪除科目
+router.delete('/subjects/:id', requireAdmin, (req, res) => {
+  const s = db.prepare('SELECT id FROM subjects WHERE id = ?').get(req.params.id);
+  if (!s) return res.status(404).json({ error: '找不到此科目' });
+  const qCount = Number(db.prepare('SELECT COUNT(*) as c FROM questions WHERE subject_id = ?').get(req.params.id).c);
+  const eCount = Number(db.prepare('SELECT COUNT(*) as c FROM exams    WHERE subject_id = ?').get(req.params.id).c);
+  if (qCount > 0 || eCount > 0) {
+    return res.status(409).json({
+      error: `此科目尚有 ${qCount} 題題目、${eCount} 場考試，請先刪除後再移除科目。`
+    });
+  }
+  db.prepare('DELETE FROM subjects WHERE id = ?').run(req.params.id);
+  res.json({ message: '科目已刪除' });
+});
+
 // GET /api/admin/students — 所有學生的成績摘要
 router.get('/students', requireAdmin, (req, res) => {
   const students = db.prepare(`

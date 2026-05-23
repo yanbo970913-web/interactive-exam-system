@@ -177,6 +177,7 @@ const App = {
       'practice':          () => PracticeModule.init(),
       'profile':           () => ProfileModule.load(),
       'admin-dashboard':   () => AdminDashboard.load(),
+      'admin-subjects':    () => AdminSubjects.load(),
       'admin-questions':   () => AdminQuestions.load(),
       'admin-exams':       () => AdminExams.load(),
       'admin-users':       () => AdminUsers.load(),
@@ -252,6 +253,7 @@ function setupNav() {
 
   const links = isAdmin ? [
     { view: 'admin-dashboard',  icon: '📊', label: '總覽' },
+    { view: 'admin-subjects',   icon: '📂', label: '科目管理' },
     { view: 'admin-questions',  icon: '📝', label: '題庫管理' },
     { view: 'admin-exams',      icon: '🗓️', label: '考試管理' },
     { view: 'admin-users',      icon: '👥', label: '使用者' },

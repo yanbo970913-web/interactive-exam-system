@@ -599,6 +599,162 @@ const AdminUsers = {
   }
 };
 
+// ─── 科目管理 ─────────────────────────────────────────
+const AdminSubjects = {
+  subjects: [],
+
+  async load() {
+    const wrapper = document.getElementById('subjectsTable');
+    if (!wrapper) return;
+    wrapper.innerHTML = '<div style="padding:24px;text-align:center"><div class="loading-spinner" style="width:28px;height:28px;margin:0 auto"></div></div>';
+    try {
+      this.subjects = await API.admin.subjects();
+      this._renderTable();
+    } catch (err) {
+      wrapper.innerHTML = `<div class="empty-state"><p>載入失敗：${escapeHtml(err.message)}</p></div>`;
+    }
+  },
+
+  _renderTable() {
+    const wrapper = document.getElementById('subjectsTable');
+    if (!wrapper) return;
+    if (this.subjects.length === 0) {
+      wrapper.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📂</div><h3>尚未建立任何科目</h3><p>點擊右上角「新增科目」開始建立</p></div>';
+      return;
+    }
+    wrapper.innerHTML = `
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead><tr>
+            <th>圖示</th><th>科目名稱</th><th>英文名稱</th><th>題目數</th><th>考試數</th><th>狀態</th><th>操作</th>
+          </tr></thead>
+          <tbody>
+            ${this.subjects.map(s => `
+              <tr>
+                <td style="font-size:1.5rem;text-align:center">${escapeHtml(s.icon || '📚')}</td>
+                <td><strong>${escapeHtml(s.name)}</strong>${s.description ? `<br><span style="font-size:0.75rem;color:#94A3B8">${escapeHtml(s.description.slice(0,40))}${s.description.length>40?'…':''}</span>` : ''}</td>
+                <td style="color:#94A3B8">${escapeHtml(s.name_en || '—')}</td>
+                <td style="text-align:center">${s.question_count}</td>
+                <td style="text-align:center">${s.exam_count}</td>
+                <td>${s.is_active ? '<span class="tag-active">啟用</span>' : '<span class="tag-inactive">停用</span>'}</td>
+                <td>
+                  <button class="btn-tbl-edit"   onclick="AdminSubjects.openEditModal(${s.id})">✏️ 編輯</button>
+                  <button class="btn-tbl-toggle" onclick="AdminSubjects.toggle(${s.id})">${s.is_active ? '🔇 停用' : '✅ 啟用'}</button>
+                  <button class="btn-tbl-delete" onclick="AdminSubjects.confirmDelete(${s.id})">🗑️ 刪除</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  },
+
+  async toggle(id) {
+    try {
+      const res = await API.admin.toggleSubject(id);
+      Toast.success(res.message);
+      await this.load();
+      await loadSubjects(); // 同步更新全域 AppState.subjects
+    } catch (err) { Toast.error(err.message); }
+  },
+
+  openAddModal()    { this._openModal(null); },
+  openEditModal(id) { this._openModal(this.subjects.find(s => s.id === id)); },
+
+  _openModal(s) {
+    const isEdit = !!s;
+    Modal.open(isEdit ? '編輯科目' : '新增科目', `
+      <div class="modal-form">
+        <div class="form-row" style="grid-template-columns:80px 1fr;gap:12px;align-items:end">
+          <div>
+            <label class="form-label">圖示 (emoji)</label>
+            <input type="text" class="form-input" id="sIcon" maxlength="4"
+              value="${escapeHtml(s?.icon || '📚')}"
+              style="font-size:1.6rem;text-align:center;padding:6px" />
+          </div>
+          <div>
+            <label class="form-label">科目名稱 <span style="color:#EF4444">*</span></label>
+            <input type="text" class="form-input" id="sName"
+              value="${escapeHtml(s?.name || '')}" placeholder="例：數學、歷史、英文…" />
+          </div>
+        </div>
+        <div>
+          <label class="form-label">英文名稱（選填）</label>
+          <input type="text" class="form-input" id="sNameEn"
+            value="${escapeHtml(s?.name_en || '')}" placeholder="e.g. Mathematics" />
+        </div>
+        <div>
+          <label class="form-label">說明（選填）</label>
+          <textarea class="form-textarea" id="sDesc" rows="2"
+            placeholder="簡短描述此科目的內容範圍…">${escapeHtml(s?.description || '')}</textarea>
+        </div>
+      </div>
+    `, `
+      <button class="btn-modal-cancel" onclick="Modal.close()">取消</button>
+      <button class="btn-modal-save" onclick="AdminSubjects.save(${s?.id || 'null'})">${isEdit ? '儲存變更' : '新增科目'}</button>
+    `);
+    setTimeout(() => document.getElementById('sName')?.focus(), 100);
+  },
+
+  async save(editId) {
+    const name        = document.getElementById('sName').value.trim();
+    const name_en     = document.getElementById('sNameEn').value.trim();
+    const description = document.getElementById('sDesc').value.trim();
+    const icon        = document.getElementById('sIcon').value.trim();
+    if (!name) { Toast.warning('請填寫科目名稱'); return; }
+    try {
+      const data = { name, name_en, description, icon: icon || '📚' };
+      if (editId) {
+        await API.admin.updateSubject(editId, data);
+        Toast.success('科目更新成功');
+      } else {
+        await API.admin.createSubject(data);
+        Toast.success('科目新增成功');
+      }
+      Modal.close();
+      await this.load();
+      await loadSubjects(); // 同步更新全域下拉選單
+    } catch (err) { Toast.error(err.message); }
+  },
+
+  confirmDelete(id) {
+    const s = this.subjects.find(s => s.id === id);
+    if (!s) return;
+    if (Number(s.question_count) > 0 || Number(s.exam_count) > 0) {
+      Modal.open('無法刪除科目', `
+        <p style="color:#FCA5A5;margin-bottom:12px">⚠️ 此科目仍有關聯資料，無法直接刪除：</p>
+        <ul style="color:#CBD5E1;font-size:0.9rem;margin-left:16px;line-height:2">
+          ${Number(s.question_count) > 0 ? `<li>📝 題目：<strong style="color:#FCD34D">${s.question_count}</strong> 題</li>` : ''}
+          ${Number(s.exam_count) > 0    ? `<li>🗓️ 考試：<strong style="color:#FCD34D">${s.exam_count}</strong> 場</li>` : ''}
+        </ul>
+        <p style="margin-top:12px;font-size:0.85rem;color:#94A3B8">請先在題庫管理、考試管理中刪除相關資料後再刪除科目。</p>
+      `, `<button class="btn-modal-cancel" onclick="Modal.close()">了解</button>`);
+      return;
+    }
+    Modal.open('確認刪除科目', `
+      <p style="color:#FCA5A5;margin-bottom:8px">⚠️ 此操作無法復原！</p>
+      <p>確定要刪除科目「<strong>${escapeHtml(s.name)}</strong>」嗎？</p>
+    `, `
+      <button class="btn-modal-cancel" onclick="Modal.close()">取消</button>
+      <button class="btn-modal-delete" onclick="AdminSubjects.doDelete(${id})">確認刪除</button>
+    `);
+  },
+
+  async doDelete(id) {
+    try {
+      await API.admin.deleteSubject(id);
+      Modal.close();
+      Toast.success('科目已刪除');
+      await this.load();
+      await loadSubjects();
+    } catch (err) {
+      Modal.close();
+      Toast.error(err.message);
+    }
+  }
+};
+
 // ─── 錯題分析模組 ──────────────────────────────────
 const AdminAttempts = {
   allAttempts: [],
