@@ -250,8 +250,7 @@ img { max-width: 100%; }
    主內容區
 ═══════════════════════════════════════════════════════ */
 .main-content { padding: 24px; max-width: 1200px; margin: 0 auto; }
-.view { animation: fadeIn 0.3s ease both; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+/* .view 入場動畫由下方 viewSlideUp 統一處理 */
 
 .view-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -1477,11 +1476,12 @@ button {
 
 /* ── View 進場動畫 升級 ─────────────────────────────── */
 .view {
-  animation: viewSlideUp 0.4s cubic-bezier(0.34,1.56,0.64,1) both !important;
+  animation: viewSlideUp 0.35s cubic-bezier(0.4, 0, 0.2, 1) both;
+  will-change: transform, opacity;
 }
 @keyframes viewSlideUp {
-  from { opacity: 0; transform: translateY(20px) scale(0.98); }
-  to   { opacity: 1; transform: translateY(0)    scale(1); }
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ── 導航連結 hover 底線動畫 ────────────────────────── */
@@ -2001,3 +2001,11 @@ button {
 }
 .assign-name { font-size: 0.88rem; font-weight: 600; color: #F1F5F9; flex: 1; }
 .assign-user { font-size: 0.75rem; color: #64748B; font-family: var(--font-mono); }
+
+/* 考試卡片「指定」標籤 */
+.exam-assigned-chip {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px; border-radius: 99px; font-size: 0.72rem; font-weight: 600;
+  background: rgba(139,92,246,0.2); color: #C4B5FD;
+  border: 1px solid rgba(139,92,246,0.35);
+}

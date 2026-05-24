@@ -20,9 +20,13 @@ if (!fs.existsSync(dbPathDir)) {
 
 const db = new DatabaseSync(dbPath);
 
-// 等效 better-sqlite3 的 pragma 呼叫
-db.exec('PRAGMA journal_mode = WAL');
-db.exec('PRAGMA foreign_keys = ON');
+// ── SQLite 效能調校
+db.exec('PRAGMA journal_mode = WAL');      // 提升並行讀寫
+db.exec('PRAGMA foreign_keys = ON');       // 外鍵約束
+db.exec('PRAGMA busy_timeout = 5000');     // 鎖定等待 5 秒再報錯
+db.exec('PRAGMA cache_size = -8000');      // 8 MB 頁面快取
+db.exec('PRAGMA synchronous = NORMAL');    // WAL 模式下安全且更快
+db.exec('PRAGMA temp_store = MEMORY');     // 暫存表放記憶體
 
 function initSchema() {
   db.exec(`

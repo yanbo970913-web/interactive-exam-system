@@ -1,10 +1,14 @@
 require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
+const express    = require('express');
+const cors       = require('cors');
+const path       = require('path');
+const compression = require('compression');
 
-const app = express();
+const app  = express();
 const PORT = process.env.PORT || 3000;
+
+// ── Gzip 壓縮（所有回應）
+app.use(compression({ level: 6, threshold: 1024 }));
 
 // ── 中介軟體
 app.use(cors({
@@ -14,8 +18,18 @@ app.use(cors({
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// ── 靜態前端
-app.use(express.static(path.join(__dirname, '../frontend')));
+// ── 靜態前端（JS/CSS/字型加長快取，HTML 不快取）
+app.use(express.static(path.join(__dirname, '../frontend'), {
+  maxAge: '7d',          // JS / CSS / 圖片 cache 7 天
+  etag: true,
+  lastModified: true,
+  setHeaders(res, filePath) {
+    // HTML 永不快取，確保更新即時生效
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    }
+  }
+}));
 
 // ── API 路由
 app.use('/api/auth',      require('./routes/auth'));
@@ -28,12 +42,20 @@ app.use('/api/live',      require('./routes/live'));
 
 // ── 健康檢查
 app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    time: new Date().toISOString(),
-    ai_enabled: !!process.env.NVIDIA_API_KEY,
-    version: '1.0.0'
-  });
+  try {
+    const db = require('./database/db');
+    const userCount = Number(db.prepare('SELECT COUNT(*) as c FROM users').get().c);
+    const qCount    = Number(db.prepare('SELECT COUNT(*) as c FROM questions WHERE is_active=1').get().c);
+    res.json({
+      status:      'ok',
+      time:        new Date().toISOString(),
+      ai_enabled:  !!process.env.NVIDIA_API_KEY,
+      version:     '1.1.0',
+      db:          { users: userCount, active_questions: qCount }
+    });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
 });
 
 // ── SPA fallback
@@ -41,10 +63,23 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../frontend/index.html'));
 });
 
+// ── 404 處理（API 路徑才回 JSON，其餘交給 SPA）
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: `找不到路由: ${req.method} ${req.path}` });
+  }
+  next();
+});
+
 // ── 全域錯誤處理
 app.use((err, req, res, next) => {
   console.error('伺服器錯誤:', err.stack);
-  res.status(500).json({ error: '伺服器內部錯誤，請稍後再試' });
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({
+    error: process.env.NODE_ENV === 'production'
+      ? '伺服器內部錯誤，請稍後再試'
+      : err.message
+  });
 });
 
 // ── 自動初始化：資料庫為空時自動執行 seed ─────────────

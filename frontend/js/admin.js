@@ -524,8 +524,8 @@ const AdminExams = {
     } catch (err) { Toast.error(err.message); }
   },
 
-  openAddModal()    { this._openModal(null); },
-  openEditModal(id) { this._openModal(this.exams.find(e => e.id === id)); },
+  openAddModal()    { this._openModal(null).catch(err => Toast.error(err.message)); },
+  openEditModal(id) { this._openModal(this.exams.find(e => e.id === id)).catch(err => Toast.error(err.message)); },
 
   // 學生清單快取（開啟 modal 時一次性載入）
   _studentCache: [],

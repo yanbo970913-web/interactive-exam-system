@@ -62,11 +62,16 @@ const ExamsListModule = {
         : `<div class="exam-attempts-badge">🔁 剩餘次數：<strong>${remaining}</strong> / ${maxAtt}</div>`;
     }
 
+    const isAssigned = exam.assignment_count > 0; // 此考試有指定學生（代表我也在內，否則不會出現在列表）
+
     return `
       <div class="exam-card tilt-card" onclick="${canStart ? `ExamModule.startExam(${exam.id})` : 'void(0)'}">
         <div class="exam-card-header">
           <span class="exam-card-icon">${exam.subject_icon || '📚'}</span>
-          <span class="exam-card-status status-${status}">${statusLabel}</span>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            ${isAssigned ? `<span class="exam-assigned-chip">👤 指定</span>` : ''}
+            <span class="exam-card-status status-${status}">${statusLabel}</span>
+          </div>
         </div>
         <div>
           <div class="exam-card-title">${escapeHtml(exam.title)}</div>
@@ -78,7 +83,7 @@ const ExamsListModule = {
           <span class="meta-tag">📝 ${exam.question_count} 題</span>
           <span class="meta-tag">🎯 ${levelText}</span>
         </div>
-        ${exam.start_time ? `<div class="meta-tag" style="font-size:0.72rem">📅 ${formatDate(exam.start_time)} ~ ${formatDate(exam.end_time)}</div>` : ''}
+        ${exam.start_time ? `<div class="meta-tag" style="font-size:0.72rem">📅 ${formatDate(exam.start_time)} ～ ${formatDate(exam.end_time)}</div>` : ''}
         ${exam.my_best_score != null ? `<div class="exam-card-score">🏆 最高分：${exam.my_best_score} 分</div>` : ''}
         ${attemptsHint}
         <button class="btn-start-exam" ${!canStart ? 'disabled style="opacity:0.5;cursor:not-allowed"' : ''}>

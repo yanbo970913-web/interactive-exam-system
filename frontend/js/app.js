@@ -364,26 +364,7 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// ── 背景粒子點 ──────────────────────────────────────
-function initParticles() {
-  const container = document.getElementById('bgParticles');
-  for (let i = 0; i < 20; i++) {
-    const dot = document.createElement('div');
-    const size = Math.random() * 4 + 1;
-    dot.style.cssText = `
-      position:absolute; border-radius:50%;
-      width:${size}px; height:${size}px;
-      background: rgba(59,130,246,${Math.random() * 0.3 + 0.05});
-      left:${Math.random() * 100}%; top:${Math.random() * 100}%;
-      animation: particleFloat ${Math.random() * 20 + 15}s ease-in-out ${Math.random() * 5}s infinite alternate;
-    `;
-    container.appendChild(dot);
-  }
-  const style = document.createElement('style');
-  const tx = Math.random() * 40 - 20, ty = Math.random() * 40 - 20;
-  style.textContent = `@keyframes particleFloat { from{transform:translate(0,0)} to{transform:translate(${tx}px,${ty}px)} }`;
-  document.head.appendChild(style);
-}
+// ── 背景粒子由 animations.js AmbientParticles 統一管理 ─
 
 // ── 煙火 / 彩帶特效 ────────────────────────────────
 function launchConfetti(duration = 2800) {
@@ -493,6 +474,5 @@ shakeStyle.textContent = `
 document.head.appendChild(shakeStyle);
 
 // ── 啟動 ────────────────────────────────────────────
-initParticles();
 initAntiCheat();
 initApp();
