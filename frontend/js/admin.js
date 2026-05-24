@@ -96,6 +96,7 @@ const AdminQuestions = {
     const level      = document.getElementById('qFilterLevel')?.value  || '';
     const type       = document.getElementById('qFilterType')?.value   || '';
     const search     = document.getElementById('qFilterSearch')?.value?.trim() || '';
+    const status     = document.getElementById('qFilterStatus')?.value || '';
     const wrapper    = document.getElementById('questionsTable');
     if (!wrapper) return;
 
@@ -107,6 +108,7 @@ const AdminQuestions = {
       if (level)      params.level      = level;
       if (type)       params.type       = type;
       if (search)     params.search     = search;
+      if (status)     params.status     = status;
 
       const data = await API.questions.list(params);
       this.questions  = data.questions;
@@ -209,15 +211,43 @@ const AdminQuestions = {
     try {
       const res = await API.questions.toggle(id);
       Toast.success(res.message);
-      // 僅更新該列狀態，不重新拉取
-      this.questions = this.questions.map(q => q.id === id ? {...q, is_active: !q.is_active} : q);
+
+      const statusFilter = document.getElementById('qFilterStatus')?.value || '';
       const row = document.getElementById(`qrow_${id}`);
-      if (row) {
-        const q = this.questions.find(q => q.id === id);
-        row.querySelector('.tag-active, .tag-inactive').outerHTML =
-          q.is_active ? '<span class="tag-active">啟用</span>' : '<span class="tag-inactive">停用</span>';
-        const toggleBtn = row.querySelector('.btn-tbl-toggle');
-        if (toggleBtn) toggleBtn.textContent = q.is_active ? '🔇 停用' : '✅ 啟用';
+
+      // 若目前有狀態篩選（只看啟用 or 只看停用），切換後該列應從表格消失
+      if (statusFilter === 'active' || statusFilter === 'inactive') {
+        if (row) {
+          row.style.transition = 'opacity 0.3s, transform 0.3s';
+          row.style.opacity = '0';
+          row.style.transform = 'translateX(20px)';
+          setTimeout(() => {
+            row.remove();
+            // 更新本地 total 計數
+            this._total = Math.max(0, this._total - 1);
+            const metaEl = document.querySelector('.q-table-meta strong');
+            if (metaEl) metaEl.textContent = this._total.toLocaleString();
+            // 若該頁已空，刷新
+            this.questions = this.questions.filter(q => q.id !== id);
+            if (this.questions.length === 0) this._fetchAndRender();
+          }, 320);
+        }
+      } else {
+        // 全部顯示模式：僅更新列的狀態標籤與按鈕
+        this.questions = this.questions.map(q => q.id === id ? {...q, is_active: !q.is_active} : q);
+        if (row) {
+          const q = this.questions.find(q => q.id === id);
+          const tagEl = row.querySelector('.tag-active, .tag-inactive');
+          if (tagEl) tagEl.outerHTML = q.is_active
+            ? '<span class="tag-active">啟用</span>'
+            : '<span class="tag-inactive">停用</span>';
+          const toggleBtn = row.querySelector('.btn-tbl-toggle');
+          if (toggleBtn) toggleBtn.textContent = q.is_active ? '🔇 停用' : '✅ 啟用';
+          // 短暫高亮
+          row.style.transition = 'background 0.4s';
+          row.style.background = q.is_active ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.06)';
+          setTimeout(() => { row.style.background = ''; }, 800);
+        }
       }
     } catch (err) { Toast.error(err.message); }
   },

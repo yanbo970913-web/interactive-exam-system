@@ -285,6 +285,11 @@
             <option value="choice">選擇題</option>
             <option value="fill">填充題</option>
           </select>
+          <select id="qFilterStatus" class="filter-select" onchange="AdminQuestions.applyFilter()">
+            <option value="">全部狀態</option>
+            <option value="active">✅ 啟用中</option>
+            <option value="inactive">🔇 已停用</option>
+          </select>
           <input id="qFilterSearch" class="filter-search-input" type="text" placeholder="🔍 搜尋題目關鍵字..."
             oninput="AdminQuestions.onSearchInput()" />
         </div>

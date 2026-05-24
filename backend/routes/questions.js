@@ -12,14 +12,23 @@ router.get('/subjects/list', requireAuth, (req, res) => {
 
 // GET /api/questions
 router.get('/', requireAuth, (req, res) => {
-  const { subject_id, level, type, search, page = 1, limit = 50 } = req.query;
+  const { subject_id, level, type, search, status, page = 1, limit = 50 } = req.query;
   const isAdmin = req.user.role === 'superadmin' || req.user.role === 'admin' || req.user.role === 'teacher';
 
   const conditions = ['1=1'];
   const countParams = [];
   const params = [];
 
-  if (!isAdmin) { conditions.push('q.is_active = 1'); }
+  if (!isAdmin) {
+    // 非管理員只能看啟用題目
+    conditions.push('q.is_active = 1');
+  } else if (status === 'active') {
+    conditions.push('q.is_active = 1');
+  } else if (status === 'inactive') {
+    conditions.push('q.is_active = 0');
+  }
+  // status 為空或其他值 → 全部顯示（管理員）
+
   if (subject_id) { conditions.push('q.subject_id = ?'); countParams.push(subject_id); }
   if (level)      { conditions.push('q.level = ?');      countParams.push(parseInt(level)); }
   if (type)       { conditions.push('q.type = ?');        countParams.push(type); }
