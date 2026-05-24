@@ -12,8 +12,8 @@ router.get('/subjects/list', requireAuth, (req, res) => {
 
 // GET /api/questions
 router.get('/', requireAuth, (req, res) => {
-  const { subject_id, level, type, page = 1, limit = 50 } = req.query;
-  const isAdmin = req.user.role === 'admin';
+  const { subject_id, level, type, search, page = 1, limit = 50 } = req.query;
+  const isAdmin = req.user.role === 'superadmin' || req.user.role === 'admin' || req.user.role === 'teacher';
 
   const conditions = ['1=1'];
   const countParams = [];
@@ -23,6 +23,7 @@ router.get('/', requireAuth, (req, res) => {
   if (subject_id) { conditions.push('q.subject_id = ?'); countParams.push(subject_id); }
   if (level)      { conditions.push('q.level = ?');      countParams.push(parseInt(level)); }
   if (type)       { conditions.push('q.type = ?');        countParams.push(type); }
+  if (search)     { conditions.push('q.question_text LIKE ?'); countParams.push(`%${search}%`); }
 
   const where = conditions.join(' AND ');
   params.push(...countParams, parseInt(limit), (parseInt(page) - 1) * parseInt(limit));

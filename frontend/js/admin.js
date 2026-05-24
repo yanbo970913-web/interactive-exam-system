@@ -66,9 +66,14 @@ const AdminDashboard = {
 // ─── 題庫管理 ─────────────────────────────────────────
 const AdminQuestions = {
   questions: [],
+  _currentPage: 1,
+  _pageSize: 50,
+  _total: 0,
+  _searchTimer: null,
 
   async load() {
-    await this.applyFilter();
+    this._currentPage = 1;
+    await this._fetchAndRender();
     // 填充科目選單
     const sel = document.getElementById('qFilterSubject');
     sel.innerHTML = '<option value="">全部科目</option>' +
@@ -76,46 +81,75 @@ const AdminQuestions = {
   },
 
   async applyFilter() {
+    this._currentPage = 1;
+    await this._fetchAndRender();
+  },
+
+  async goPage(p) {
+    this._currentPage = p;
+    await this._fetchAndRender(true);
+    document.getElementById('questionsTable')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  },
+
+  async _fetchAndRender(silent = false) {
     const subject_id = document.getElementById('qFilterSubject')?.value || '';
-    const level = document.getElementById('qFilterLevel')?.value || '';
-    const type = document.getElementById('qFilterType')?.value || '';
-    const wrapper = document.getElementById('questionsTable');
+    const level      = document.getElementById('qFilterLevel')?.value  || '';
+    const type       = document.getElementById('qFilterType')?.value   || '';
+    const search     = document.getElementById('qFilterSearch')?.value?.trim() || '';
+    const wrapper    = document.getElementById('questionsTable');
     if (!wrapper) return;
 
-    wrapper.innerHTML = '<div style="padding:24px;text-align:center"><div class="loading-spinner" style="width:28px;height:28px;margin:0 auto"></div></div>';
+    if (!silent) wrapper.innerHTML = '<div style="padding:24px;text-align:center"><div class="loading-spinner" style="width:28px;height:28px;margin:0 auto"></div></div>';
 
     try {
-      const params = {};
+      const params = { page: this._currentPage, limit: this._pageSize };
       if (subject_id) params.subject_id = subject_id;
-      if (level) params.level = level;
-      if (type) params.type = type;
-      params.limit = 200;
+      if (level)      params.level      = level;
+      if (type)       params.type       = type;
+      if (search)     params.search     = search;
 
       const data = await API.questions.list(params);
-      this.questions = data.questions;
+      this.questions  = data.questions;
+      this._total     = data.total;
+      const totalPages = Math.max(1, Math.ceil(this._total / this._pageSize));
+      const pageStart  = (this._currentPage - 1) * this._pageSize + 1;
+      const pageEnd    = Math.min(this._currentPage * this._pageSize, this._total);
 
       if (this.questions.length === 0) {
         wrapper.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><h3>沒有符合條件的題目</h3></div>';
         return;
       }
 
+      // ── Pagination bar ──
+      const paginationBar = this._buildPagination(totalPages);
+
       wrapper.innerHTML = `
-        <p style="font-size:0.8rem;color:#64748B;margin-bottom:12px">共 ${data.total} 題</p>
+        <div class="q-table-meta">
+          <span>共 <strong>${this._total.toLocaleString()}</strong> 題 ｜ 顯示第 ${pageStart}–${pageEnd} 題</span>
+          <div class="q-page-size-wrap">
+            每頁
+            <select class="form-select q-pagesize-sel" onchange="AdminQuestions.changePageSize(this.value)">
+              ${[25,50,100,200].map(n=>`<option value="${n}" ${n===this._pageSize?'selected':''}>${n}</option>`).join('')}
+            </select>
+            題
+          </div>
+        </div>
+        ${paginationBar}
         <div class="table-wrapper">
           <table class="data-table">
             <thead><tr>
-              <th style="width:50px">#</th><th>科目</th><th>等級</th><th>題型</th><th>題目（前40字）</th><th>狀態</th><th>操作</th>
+              <th style="width:50px">#</th><th>科目</th><th>等級</th><th>題型</th><th>題目內容</th><th>狀態</th><th>操作</th>
             </tr></thead>
             <tbody>
               ${this.questions.map((q, idx) => `
-                <tr>
-                  <td style="text-align:center;color:#64748B;font-size:0.82rem">${idx + 1}</td>
-                  <td>${escapeHtml(q.subject_name)}</td>
-                  <td>Lv.${q.level}</td>
+                <tr class="q-row" id="qrow_${q.id}">
+                  <td style="text-align:center;color:#64748B;font-size:0.82rem">${pageStart + idx}</td>
+                  <td style="font-size:0.82rem">${escapeHtml(q.subject_name)}</td>
+                  <td><span class="q-level-badge">Lv.${q.level}</span></td>
                   <td>${q.type === 'choice' ? '<span class="tag-type-choice">選擇題</span>' : '<span class="tag-type-fill">填充題</span>'}</td>
-                  <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(q.question_text.slice(0,60))}${q.question_text.length>60?'…':''}</td>
+                  <td class="q-text-cell" title="${escapeHtml(q.question_text)}">${escapeHtml(q.question_text.slice(0,80))}${q.question_text.length>80?'…':''}</td>
                   <td>${q.is_active ? '<span class="tag-active">啟用</span>' : '<span class="tag-inactive">停用</span>'}</td>
-                  <td>
+                  <td class="q-actions-cell">
                     <button class="btn-tbl-edit"   onclick="AdminQuestions.openEditModal(${q.id})">✏️ 編輯</button>
                     <button class="btn-tbl-toggle" onclick="AdminQuestions.toggle(${q.id})">${q.is_active ? '🔇 停用' : '✅ 啟用'}</button>
                     <button class="btn-tbl-delete" onclick="AdminQuestions.confirmDelete(${q.id})">🗑️ 刪除</button>
@@ -125,17 +159,66 @@ const AdminQuestions = {
             </tbody>
           </table>
         </div>
+        ${paginationBar}
       `;
     } catch (err) {
       wrapper.innerHTML = `<div class="empty-state"><p>載入失敗：${escapeHtml(err.message)}</p></div>`;
     }
   },
 
+  _buildPagination(totalPages) {
+    if (totalPages <= 1) return '';
+    const cur = this._currentPage;
+
+    let pages = [];
+    if (totalPages <= 7) {
+      pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+    } else {
+      pages = [1];
+      if (cur > 3) pages.push('…');
+      for (let i = Math.max(2, cur - 1); i <= Math.min(totalPages - 1, cur + 1); i++) pages.push(i);
+      if (cur < totalPages - 2) pages.push('…');
+      pages.push(totalPages);
+    }
+
+    const btn = (label, page, disabled = false, active = false) =>
+      `<button class="q-pg-btn ${active?'active':''}" ${disabled?'disabled':''} onclick="AdminQuestions.goPage(${page})">${label}</button>`;
+
+    return `<div class="q-pagination">
+      ${btn('‹', cur - 1, cur === 1)}
+      ${pages.map(p => p === '…' ? '<span class="q-pg-ellipsis">…</span>' : btn(p, p, false, p === cur)).join('')}
+      ${btn('›', cur + 1, cur === totalPages)}
+      <span class="q-pg-info">第 ${cur} / ${totalPages} 頁</span>
+      <input class="q-pg-jump" type="number" min="1" max="${totalPages}" placeholder="跳頁"
+        onkeydown="if(event.key==='Enter'){const v=parseInt(this.value);if(v>=1&&v<=${totalPages})AdminQuestions.goPage(v);this.value=''}">
+    </div>`;
+  },
+
+  changePageSize(n) {
+    this._pageSize = parseInt(n);
+    this._currentPage = 1;
+    this._fetchAndRender();
+  },
+
+  onSearchInput() {
+    clearTimeout(this._searchTimer);
+    this._searchTimer = setTimeout(() => this.applyFilter(), 400);
+  },
+
   async toggle(id) {
     try {
       const res = await API.questions.toggle(id);
       Toast.success(res.message);
-      this.applyFilter();
+      // 僅更新該列狀態，不重新拉取
+      this.questions = this.questions.map(q => q.id === id ? {...q, is_active: !q.is_active} : q);
+      const row = document.getElementById(`qrow_${id}`);
+      if (row) {
+        const q = this.questions.find(q => q.id === id);
+        row.querySelector('.tag-active, .tag-inactive').outerHTML =
+          q.is_active ? '<span class="tag-active">啟用</span>' : '<span class="tag-inactive">停用</span>';
+        const toggleBtn = row.querySelector('.btn-tbl-toggle');
+        if (toggleBtn) toggleBtn.textContent = q.is_active ? '🔇 停用' : '✅ 啟用';
+      }
     } catch (err) { Toast.error(err.message); }
   },
 

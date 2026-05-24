@@ -285,6 +285,8 @@
             <option value="choice">選擇題</option>
             <option value="fill">填充題</option>
           </select>
+          <input id="qFilterSearch" class="filter-search-input" type="text" placeholder="🔍 搜尋題目關鍵字..."
+            oninput="AdminQuestions.onSearchInput()" />
         </div>
         <div id="questionsTable" class="questions-table-wrapper"></div>
       </section>
