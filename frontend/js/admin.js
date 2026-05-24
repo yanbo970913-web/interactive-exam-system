@@ -285,62 +285,106 @@ const AdminQuestions = {
 const AdminExams = {
   exams: [],
 
-  async load() {
+  _autoRefreshTimer: null,
+
+  async load(silent = false) {
     const wrapper = document.getElementById('adminExamsTable');
-    wrapper.innerHTML = '<div style="padding:24px;text-align:center"><div class="loading-spinner" style="width:28px;height:28px;margin:0 auto"></div></div>';
+    if (!silent) wrapper.innerHTML = '<div style="padding:24px;text-align:center"><div class="loading-spinner" style="width:28px;height:28px;margin:0 auto"></div></div>';
 
     try {
       this.exams = await API.exams.list();
-
-      if (this.exams.length === 0) {
-        wrapper.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><h3>尚未建立任何考試</h3></div>';
-        return;
-      }
-
-      wrapper.innerHTML = `
-        <div class="table-wrapper">
-          <table class="data-table">
-            <thead><tr>
-              <th>名稱</th><th>科目</th><th>題數/時長</th><th>次數上限</th><th>開始時間</th><th>截止時間</th><th>狀態</th><th>操作</th>
-            </tr></thead>
-            <tbody>
-              ${this.exams.map(e => `
-                <tr>
-                  <td><strong>${escapeHtml(e.title)}</strong></td>
-                  <td>${e.subject_icon} ${escapeHtml(e.subject_name)}</td>
-                  <td>${e.question_count}題 / ${e.duration_minutes}分</td>
-                  <td style="text-align:center">
-                    ${e.max_attempts != null
-                      ? `<span style="background:rgba(245,158,11,0.2);color:#FCD34D;padding:2px 8px;border-radius:99px;font-size:0.78rem">最多 ${e.max_attempts} 次</span>`
-                      : '<span style="color:#64748B;font-size:0.78rem">無限制</span>'}
-                  </td>
-                  <td style="font-size:0.8rem">${formatDate(e.start_time)}</td>
-                  <td style="font-size:0.8rem">${formatDate(e.end_time)}</td>
-                  <td>${e.is_active ? '<span class="tag-active">開放</span>' : '<span class="tag-inactive">關閉</span>'}</td>
-                  <td>
-                    <button class="btn-tbl-edit"   onclick="AdminExams.openEditModal(${e.id})">✏️ 編輯</button>
-                    <button class="btn-tbl-toggle" onclick="AdminExams.toggle(${e.id})">${e.is_active ? '🔇 關閉' : '✅ 開放'}</button>
-                    <button class="btn-tbl-delete" onclick="AdminExams.confirmDelete(${e.id})">🗑️ 刪除</button>
-                  </td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      `;
+      this._renderTable();
+      // 更新最後刷新時間
+      const ts = document.getElementById('examLastRefresh');
+      if (ts) ts.textContent = `最後更新：${new Date().toLocaleTimeString('zh-TW')}`;
     } catch (err) {
-      wrapper.innerHTML = `<div class="empty-state"><p>載入失敗：${escapeHtml(err.message)}</p></div>`;
+      if (!silent) wrapper.innerHTML = `<div class="empty-state"><p>載入失敗：${escapeHtml(err.message)}</p></div>`;
     }
   },
 
-  async toggle(id) {
+  startAutoRefresh() {
+    this.stopAutoRefresh();
+    this._autoRefreshTimer = setInterval(() => this.load(true), 30000); // 每30秒靜默刷新
+  },
+
+  stopAutoRefresh() {
+    if (this._autoRefreshTimer) { clearInterval(this._autoRefreshTimer); this._autoRefreshTimer = null; }
+  },
+
+  _renderTable() {
+    const wrapper = document.getElementById('adminExamsTable');
+    if (this.exams.length === 0) {
+      wrapper.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><h3>尚未建立任何考試</h3></div>';
+      return;
+    }
+    wrapper.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <span id="examLastRefresh" style="font-size:0.75rem;color:#64748B"></span>
+        <button class="btn-tbl-edit" onclick="AdminExams.load()" style="font-size:0.75rem;padding:4px 10px">🔄 刷新</button>
+        <label style="display:flex;align-items:center;gap:6px;font-size:0.75rem;color:#94A3B8;cursor:pointer">
+          <input type="checkbox" id="examAutoRefresh" onchange="AdminExams.toggleAutoRefresh(this.checked)"
+            style="accent-color:#3B82F6" />
+          自動刷新 (30秒)
+        </label>
+      </div>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead><tr>
+            <th>名稱</th><th>科目</th><th>題數/時長</th><th>次數上限</th><th>開始時間</th><th>截止時間</th><th>狀態</th><th>操作</th>
+          </tr></thead>
+          <tbody>
+            ${this.exams.map(e => `
+              <tr id="examRow_${e.id}">
+                <td><strong>${escapeHtml(e.title)}</strong>
+                  ${e.description ? `<br><span style="font-size:0.75rem;color:#94A3B8">${escapeHtml(e.description.slice(0,40))}${e.description.length>40?'…':''}</span>` : ''}
+                </td>
+                <td>${e.subject_icon} ${escapeHtml(e.subject_name)}</td>
+                <td>${e.question_count}題 / ${e.duration_minutes}分</td>
+                <td style="text-align:center">
+                  ${e.max_attempts != null
+                    ? `<span style="background:rgba(245,158,11,0.2);color:#FCD34D;padding:2px 8px;border-radius:99px;font-size:0.78rem">最多 ${e.max_attempts} 次</span>`
+                    : '<span style="color:#64748B;font-size:0.78rem">無限制</span>'}
+                </td>
+                <td style="font-size:0.8rem">${formatDate(e.start_time)}</td>
+                <td style="font-size:0.8rem">${formatDate(e.end_time)}</td>
+                <td>${e.is_active ? '<span class="tag-active">開放</span>' : '<span class="tag-inactive">關閉</span>'}</td>
+                <td>
+                  <button class="btn-tbl-edit"   onclick="AdminExams.openEditModal(${e.id})">✏️ 編輯</button>
+                  <button class="btn-tbl-toggle" onclick="AdminExams.quickToggle(${e.id})">${e.is_active ? '🔇 關閉' : '✅ 開放'}</button>
+                  <button class="btn-tbl-delete" onclick="AdminExams.confirmDelete(${e.id})">🗑️ 刪除</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+    // 恢復自動刷新 checkbox 狀態
+    const cb = document.getElementById('examAutoRefresh');
+    if (cb) cb.checked = !!this._autoRefreshTimer;
+    // 更新時間戳
+    const ts = document.getElementById('examLastRefresh');
+    if (ts) ts.textContent = `最後更新：${new Date().toLocaleTimeString('zh-TW')}`;
+  },
+
+  toggleAutoRefresh(checked) {
+    if (checked) this.startAutoRefresh();
+    else this.stopAutoRefresh();
+  },
+
+  // 快速切換開關（無需重載全部）
+  async quickToggle(id) {
     const exam = this.exams.find(e => e.id === id);
+    if (!exam) return;
     try {
       await API.exams.update(id, { is_active: exam.is_active ? 0 : 1 });
-      Toast.success(exam.is_active ? '考試已關閉' : '考試已開放');
-      this.load();
+      exam.is_active = exam.is_active ? 0 : 1; // 本地更新
+      Toast.success(exam.is_active ? '考試已開放' : '考試已關閉');
+      this._renderTable(); // 僅重繪表格，不重新 fetch
     } catch (err) { Toast.error(err.message); }
   },
+
+  async toggle(id) { return this.quickToggle(id); },
 
   async confirmDelete(id) {
     const e = this.exams.find(e => e.id === id);
@@ -661,7 +705,19 @@ const AdminSubjects = {
       wrapper.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📂</div><h3>尚未建立任何科目</h3><p>點擊右上角「新增科目」開始建立</p></div>';
       return;
     }
-    wrapper.innerHTML = `
+    // 找出英文科目（用於顯示同步按鈕）
+    const engSubject = this.subjects.find(s => s.name.includes('英文'));
+    const syncBtnHTML = engSubject ? `
+      <div style="margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:0.82rem;color:#94A3B8">🔤 英文單字題庫（${engSubject.question_count} 題）</span>
+        <button class="btn-tbl-edit" id="btnSyncVocab" onclick="AdminSubjects.syncVocabulary()"
+          style="background:linear-gradient(135deg,#7C3AED,#6D28D9);color:#fff;border:none">
+          🔄 重新同步單字題庫
+        </button>
+        <span style="font-size:0.75rem;color:#64748B">（將以最新 vocabulary.js 重建所有英文題目）</span>
+      </div>
+    ` : '';
+    wrapper.innerHTML = syncBtnHTML + `
       <div class="table-wrapper">
         <table class="data-table">
           <thead><tr>
@@ -687,6 +743,22 @@ const AdminSubjects = {
         </table>
       </div>
     `;
+  },
+
+  async syncVocabulary() {
+    const btn = document.getElementById('btnSyncVocab');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ 同步中...'; }
+    try {
+      Loading.show('正在重建英文單字題庫，請稍候...');
+      const result = await API.admin.syncVocabulary();
+      Toast.success(result.message, 5000);
+      await this.load(); // 重新整理表格
+    } catch (err) {
+      Toast.error('同步失敗：' + err.message);
+      if (btn) { btn.disabled = false; btn.textContent = '🔄 重新同步單字題庫'; }
+    } finally {
+      Loading.hide();
+    }
   },
 
   async toggle(id) {

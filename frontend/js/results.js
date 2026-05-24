@@ -187,7 +187,7 @@ const ResultsModule = {
       responseBox.innerHTML = `
         <div class="ai-response-box">
           <div class="ai-response-content">${renderMarkdown(data.response)}</div>
-          ${data.is_fallback ? `<div class="ai-fallback-notice">⚠️ 目前使用模擬 AI 模式。設定 ANTHROPIC_API_KEY 可獲得更精準的個人化分析。</div>` : ''}
+          ${data.is_fallback ? `<div class="ai-fallback-notice">💡 設定 NVIDIA_API_KEY 環境變數可獲得 AI 個人化分析</div>` : ''}
         </div>
       `;
 

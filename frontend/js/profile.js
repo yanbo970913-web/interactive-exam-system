@@ -82,13 +82,16 @@ const ProfileModule = {
     const file = event.target.files[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) { Toast.warning('請選擇圖片檔案'); return; }
-    if (file.size > 1.5 * 1024 * 1024) { Toast.warning('圖片大小不能超過 1.5MB'); return; }
+    if (file.size > 10 * 1024 * 1024) { Toast.warning('圖片大小不能超過 10MB'); return; }
+
+    // 讀取使用者自訂的壓縮尺寸（可自行設定）
+    const sizeEl = document.getElementById('avatarMaxSize');
+    const maxSize = sizeEl ? parseInt(sizeEl.value) : 400;
 
     const reader = new FileReader();
     reader.onload = (e) => {
       const raw = e.target.result;
-      // 壓縮至最大 400×400
-      this._compressImage(raw, 400, (compressed) => {
+      this._compressImage(raw, maxSize, (compressed) => {
         this.pendingAvatarImage = compressed;
         const wrap = document.getElementById('avatarPreviewWrap');
         wrap.innerHTML = '';
@@ -99,7 +102,8 @@ const ProfileModule = {
         wrap.appendChild(img);
         const btnRemove = document.getElementById('btnRemoveAvatar');
         if (btnRemove) btnRemove.style.display = 'inline-flex';
-        Toast.info('圖片已選取，按下「儲存設定」即可上傳。');
+        const kb = Math.round(compressed.length * 0.75 / 1024);
+        Toast.info(`圖片已選取（${maxSize}×${maxSize} px，約 ${kb} KB），按下「儲存設定」即可上傳。`);
       });
     };
     reader.readAsDataURL(file);

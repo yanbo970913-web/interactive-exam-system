@@ -254,7 +254,10 @@ const PracticeModule = {
       const emoji = score >= 90 ? '🏆' : score >= 60 ? '🎉' : '💪';
       const message = score >= 90 ? '完美！繼續保持！' : score >= 60 ? '通過了！做得很好！' : '再練幾次，一定進步！';
 
-      const detailHTML = checks.map(({ q, userAns, isCorrect }) => `
+      // 儲存批改結果供 AI 家教按鈕使用（避免 onclick inline 字串傳參問題）
+    this._lastChecks = checks;
+
+    const detailHTML = checks.map(({ q, userAns, isCorrect }, checkIdx) => `
         <div class="question-result-card ${isCorrect ? 'correct' : 'wrong'}" style="margin-bottom:12px">
           <div class="result-card-header">
             <span class="result-icon">${isCorrect ? '✅' : '❌'}</span>
@@ -262,7 +265,7 @@ const PracticeModule = {
           </div>
           ${q.options && q.type === 'choice' ? `
             <div style="margin-top:8px;font-size:0.8rem;color:#64748B">
-              選項：${q.options.map((o,i) => `${['A','B','C','D'][i]}.${escapeHtml(o)}`).join('、')}
+              選項：${q.options.map((o,oi) => `${['A','B','C','D'][oi]}.${escapeHtml(o)}`).join('、')}
             </div>` : ''}
           <div class="result-answers">
             <div class="result-answer-row">
@@ -276,11 +279,11 @@ const PracticeModule = {
           </div>
           ${q.explanation ? `<div class="result-explanation">💡 ${escapeHtml(q.explanation)}</div>` : ''}
           ${!isCorrect ? `
-            <button class="btn-ai-explain" id="pAiBtn_${q.id}"
-              onclick="PracticeModule.requestAI('${escapeHtml(q.question_text).replace(/'/g,"\\'")}','${escapeHtml(q.correct_answer).replace(/'/g,"\\'")}','${escapeHtml(userAns).replace(/'/g,"\\'")}',${q.id})">
+            <button class="btn-ai-explain" id="pAiBtn_${checkIdx}"
+              onclick="PracticeModule.requestAIByIdx(${checkIdx})">
               🤖 AI 家教幫我分析這題
             </button>
-            <div id="pAiResp_${q.id}" class="hidden"></div>
+            <div id="pAiResp_${checkIdx}" class="hidden"></div>
           ` : ''}
         </div>
       `).join('');
@@ -333,9 +336,12 @@ const PracticeModule = {
   },
 
   /* ── AI 家教（練習模式）── */
-  async requestAI(questionText, correctAnswer, userAnswer, qId) {
-    const btn = document.getElementById(`pAiBtn_${qId}`);
-    const box = document.getElementById(`pAiResp_${qId}`);
+  // 用索引查詢儲存的批改結果，避免 onclick inline 傳參問題
+  async requestAIByIdx(idx) {
+    const check = this._lastChecks?.[idx];
+    if (!check) { Toast.error('找不到題目資料'); return; }
+    const btn = document.getElementById(`pAiBtn_${idx}`);
+    const box = document.getElementById(`pAiResp_${idx}`);
     if (!btn || !box) return;
 
     btn.disabled = true;
@@ -345,21 +351,23 @@ const PracticeModule = {
     try {
       const subject = AppState.subjects.find(s => s.id === this.selectedSubject);
       const data = await API.ai.explain({
-        question_text:  questionText,
-        correct_answer: correctAnswer,
-        user_answer:    userAnswer,
-        subject_name:   subject?.name || ''
+        question_text:  check.q.question_text,
+        correct_answer: check.q.correct_answer,
+        user_answer:    check.userAns,
+        subject_name:   subject?.name || '',
+        explanation:    check.q.explanation || ''
       });
 
       box.classList.remove('hidden');
       box.innerHTML = `
         <div class="ai-response-box">
           <div class="ai-response-content">${renderMarkdown(data.response)}</div>
-          ${data.is_fallback ? `<div class="ai-fallback-notice">⚠️ 目前使用模擬 AI 模式。設定 NVIDIA_API_KEY 可獲得個人化分析。</div>` : ''}
+          ${data.is_fallback ? `<div class="ai-fallback-notice">💡 設定 NVIDIA_API_KEY 可獲得 AI 個人化分析</div>` : ''}
         </div>
       `;
       btn.textContent = '✅ AI 分析完成';
       btn.style.background = 'linear-gradient(135deg, #065F46, #047857)';
+      btn.style.opacity = '';
     } catch (err) {
       btn.disabled = false;
       btn.textContent = '🤖 AI 家教幫我分析這題';

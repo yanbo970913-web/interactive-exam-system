@@ -66,7 +66,7 @@ function generateFallbackResponse(questionText, correctAnswer, userAnswer, subje
   }
 
   r += `### ✅ 正確觀念\n正確答案是 **「${correctAnswer}」**，請牢記這個答案！\n\n`;
-  r += `> 💡 *在 Railway 環境變數設定 NVIDIA_API_KEY 可獲得 AI 個人化分析*`;
+  r += `\n> 💡 在 Railway 環境變數設定 **NVIDIA_API_KEY** 可獲得 AI 個人化分析`;
   return r;
 }
 

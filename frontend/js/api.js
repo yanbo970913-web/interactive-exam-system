@@ -88,7 +88,8 @@ const API = (() => {
       createSubject: (data)       => request('POST',   '/admin/subjects', data),
       updateSubject: (id, data)   => request('PUT',    `/admin/subjects/${id}`, data),
       toggleSubject: (id)         => request('PATCH',  `/admin/subjects/${id}/toggle`),
-      deleteSubject: (id, cascade) => request('DELETE', `/admin/subjects/${id}${cascade ? '?cascade=true' : ''}`),
+      deleteSubject:   (id, cascade) => request('DELETE', `/admin/subjects/${id}${cascade ? '?cascade=true' : ''}`),
+      syncVocabulary:  ()           => request('POST',   '/admin/sync-vocabulary'),
     },
     // 即時進度
     live: {

@@ -191,6 +191,71 @@ router.delete('/subjects/:id', requireSuperAdmin, (req, res) => {
   }
 });
 
+// POST /api/admin/sync-vocabulary — 重新同步英文單字題目（刪除後重建）
+router.post('/sync-vocabulary', requireSuperAdmin, (req, res) => {
+  let vocabulary;
+  try {
+    const vocabPath = require.resolve('../data/vocabulary');
+    delete require.cache[vocabPath];
+    vocabulary = require('../data/vocabulary');
+  } catch (e) {
+    return res.status(500).json({ error: '載入單字庫失敗：' + e.message });
+  }
+
+  const subject = db.prepare("SELECT id, name FROM subjects WHERE name LIKE '%英文%'").get();
+  if (!subject) return res.status(404).json({ error: '找不到英文單字科目，請先建立科目' });
+
+  function shuffleArray(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  // 去重：同一 word 只保留最低 level 的那筆
+  const seen = new Map();
+  for (const v of vocabulary) {
+    const key = v.word.toLowerCase();
+    if (!seen.has(key) || v.level < seen.get(key).level) seen.set(key, v);
+  }
+  const uniqueVocab = [...seen.values()];
+
+  const adminId = req.user.id;
+  db.exec('BEGIN');
+  try {
+    db.prepare('DELETE FROM questions WHERE subject_id = ?').run(subject.id);
+    const insert = db.prepare(`
+      INSERT INTO questions (subject_id, level, type, question_text, options, correct_answer, explanation, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    let count = 0;
+    for (const vocab of uniqueVocab) {
+      insert.run(subject.id, vocab.level, 'fill',
+        `請拼出以下中文意思對應的英文單字：\n「${vocab.translation}」`,
+        null, vocab.word.toLowerCase(),
+        `正確答案是「${vocab.word}」（${vocab.translation}）。Level ${vocab.level} 單字，請熟記拼法。`,
+        adminId);
+      const sameLevel = uniqueVocab.filter(v => v.level === vocab.level && v.word !== vocab.word);
+      const distractors = shuffleArray(sameLevel).slice(0, 3).map(v => v.translation);
+      const allOptions = shuffleArray([vocab.translation, ...distractors]);
+      insert.run(subject.id, vocab.level, 'choice',
+        `英文單字「${vocab.word}」的中文意思是？`,
+        JSON.stringify(allOptions), vocab.translation,
+        `「${vocab.word}」的中文意思是「${vocab.translation}」。Level ${vocab.level} 單字。`,
+        adminId);
+      count += 2;
+    }
+    db.exec('COMMIT');
+    console.log(`✅ 單字題庫同步完成：${uniqueVocab.length} 個單字，${count} 題`);
+    res.json({ message: `✅ 同步完成！共建立 ${count} 題（${uniqueVocab.length} 個單字）`, count, words: uniqueVocab.length });
+  } catch (err) {
+    db.exec('ROLLBACK');
+    res.status(500).json({ error: '同步失敗：' + err.message });
+  }
+});
+
 // GET /api/admin/students — 所有學生的成績摘要
 router.get('/students', requireStaff, (req, res) => {
   const students = db.prepare(`

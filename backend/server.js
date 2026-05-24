@@ -31,7 +31,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     time: new Date().toISOString(),
-    ai_enabled: !!process.env.ANTHROPIC_API_KEY,
+    ai_enabled: !!process.env.NVIDIA_API_KEY,
     version: '1.0.0'
   });
 });

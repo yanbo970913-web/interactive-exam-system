@@ -119,20 +119,47 @@ const Loading = {
 
 // ── Modal ──────────────────────────────────────────
 const Modal = {
-  open(title, bodyHTML, footerHTML = '') {
+  _allowBackdropClose: false,
+
+  // allowBackdrop: 警告/確認框允許背景點關閉；表單(新增/編輯)不允許
+  open(title, bodyHTML, footerHTML = '', { allowBackdrop = false } = {}) {
     document.getElementById('modalTitle').textContent = title;
     document.getElementById('modalBody').innerHTML = bodyHTML;
     document.getElementById('modalFooter').innerHTML = footerHTML;
     document.getElementById('globalModal').classList.remove('hidden');
+    this._allowBackdropClose = allowBackdrop;
+    // 自動偵測：若 footer 只有「了解」等單一確認按鈕視為資訊框可背景關閉
+    if (footerHTML && !footerHTML.includes('btn-modal-save') && !footerHTML.includes('btn-modal-delete')) {
+      this._allowBackdropClose = true;
+    }
   },
   close() {
     document.getElementById('globalModal').classList.add('hidden');
     document.getElementById('modalBody').innerHTML = '';
     document.getElementById('modalFooter').innerHTML = '';
+    this._allowBackdropClose = false;
   }
 };
+
+// 背景點擊：只有 allowBackdropClose 為 true 時才關閉（避免表單誤關）
 document.getElementById('globalModal').addEventListener('click', (e) => {
-  if (e.target.id === 'globalModal') Modal.close();
+  if (e.target.id === 'globalModal' && Modal._allowBackdropClose) Modal.close();
+});
+// ESC 鍵關閉（表單模式時給出提示）
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const modal = document.getElementById('globalModal');
+  if (modal.classList.contains('hidden')) return;
+  if (Modal._allowBackdropClose) {
+    Modal.close();
+  } else {
+    // 表單模式：ESC 提示但不強關（防止誤關丟失資料）
+    const body = document.getElementById('modalBody');
+    body.style.outline = '2px solid #F59E0B';
+    body.style.borderRadius = '8px';
+    setTimeout(() => { body.style.outline = ''; body.style.borderRadius = ''; }, 600);
+    Toast.warning('請點擊「取消」按鈕退出，以免資料遺失');
+  }
 });
 
 // ── Markdown 渲染（輕量版）──────────────────────────
@@ -161,6 +188,10 @@ const App = {
     // 離開即時監控頁面時斷開 SSE
     if (this.currentView === 'live-progress' && viewId !== 'live-progress') {
       if (typeof AdminLiveProgress !== 'undefined') AdminLiveProgress.leave();
+    }
+    // 離開考試管理頁面時停止自動刷新
+    if (this.currentView === 'admin-exams' && viewId !== 'admin-exams') {
+      if (typeof AdminExams !== 'undefined') AdminExams.stopAutoRefresh();
     }
 
     document.querySelectorAll('.view').forEach(v => {
