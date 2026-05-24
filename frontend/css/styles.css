@@ -1924,3 +1924,80 @@ button {
 /* tag types */
 .tag-type-choice { display:inline-block;padding:2px 8px;border-radius:99px;background:rgba(59,130,246,0.18);color:#93C5FD;font-size:0.75rem;font-weight:600; }
 .tag-type-fill   { display:inline-block;padding:2px 8px;border-radius:99px;background:rgba(16,185,129,0.18);color:#6EE7B7;font-size:0.75rem;font-weight:600; }
+
+/* ═══════════════════════════════════════════════════
+   指定學生 (Exam Assignment Picker)
+═══════════════════════════════════════════════════ */
+.exam-assign-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 99px;
+  background: rgba(139,92,246,0.2); color: #C4B5FD;
+  border: 1px solid rgba(139,92,246,0.3); font-size: 0.78rem; font-weight: 600;
+}
+
+.assign-section {
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  padding: 16px;
+  background: rgba(255,255,255,0.02);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.assign-section-header {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.assign-hint {
+  font-size: 0.75rem; color: #64748B; flex: 1;
+}
+.assign-actions { display: flex; gap: 6px; }
+.btn-assign-action {
+  padding: 3px 10px; border-radius: 6px; font-size: 0.78rem;
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+  color: #CBD5E1; cursor: pointer; transition: all 0.15s;
+}
+.btn-assign-action:hover { background: rgba(59,130,246,0.2); border-color: #3B82F6; color: #fff; }
+
+.assign-count-bar {
+  font-size: 0.82rem; color: #94A3B8;
+  padding: 6px 10px; background: rgba(255,255,255,0.04);
+  border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);
+}
+.assign-count-bar strong { color: #A78BFA; }
+
+.assign-search {
+  width: 100%; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+  color: #F1F5F9; outline: none; transition: border-color 0.2s;
+}
+.assign-search:focus { border-color: #8B5CF6; }
+.assign-search::placeholder { color: #475569; }
+
+.assign-list {
+  max-height: 220px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 2px;
+  scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.1) transparent;
+}
+.assign-list::-webkit-scrollbar { width: 4px; }
+.assign-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+
+.assign-student-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 8px; cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+  user-select: none;
+}
+.assign-student-row:hover { background: rgba(255,255,255,0.05); }
+.assign-student-row.selected {
+  background: rgba(139,92,246,0.12);
+  border-color: rgba(139,92,246,0.3);
+}
+.assign-student-row input[type="checkbox"] {
+  width: 16px; height: 16px; flex-shrink: 0;
+  accent-color: #8B5CF6; cursor: pointer;
+}
+.assign-avatar {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.8rem; font-weight: 700; color: #fff;
+}
+.assign-name { font-size: 0.88rem; font-weight: 600; color: #F1F5F9; flex: 1; }
+.assign-user { font-size: 0.75rem; color: #64748B; font-family: var(--font-mono); }

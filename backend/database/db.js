@@ -141,6 +141,23 @@ try {
 // 遷移：新增 max_attempts 欄位（NULL = 無限次）
 try { db.exec('ALTER TABLE exams ADD COLUMN max_attempts INTEGER DEFAULT NULL'); } catch (_) {}
 
+// 遷移：指定學生考試分配表
+try {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS exam_assignments (
+      id       INTEGER PRIMARY KEY AUTOINCREMENT,
+      exam_id  INTEGER NOT NULL,
+      user_id  INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (exam_id) REFERENCES exams(id),
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      UNIQUE(exam_id, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_assignments_exam ON exam_assignments(exam_id);
+    CREATE INDEX IF NOT EXISTS idx_assignments_user ON exam_assignments(user_id);
+  `);
+} catch (_) {}
+
 // 一次性清理：刪除 Python 程式設計、數位邏輯 科目及其所有題目
 try {
   const toRemove = ['Python 程式設計', '數位邏輯'];

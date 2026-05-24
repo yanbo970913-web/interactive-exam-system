@@ -443,7 +443,7 @@ const AdminExams = {
       <div class="table-wrapper">
         <table class="data-table">
           <thead><tr>
-            <th>名稱</th><th>科目</th><th>題數/時長</th><th>次數上限</th><th>開始時間</th><th>截止時間</th><th>狀態</th><th>操作</th>
+            <th>名稱</th><th>科目</th><th>題數/時長</th><th>次數上限</th><th>指定學生</th><th>開始時間</th><th>截止時間</th><th>狀態</th><th>操作</th>
           </tr></thead>
           <tbody>
             ${this.exams.map(e => `
@@ -457,6 +457,11 @@ const AdminExams = {
                   ${e.max_attempts != null
                     ? `<span style="background:rgba(245,158,11,0.2);color:#FCD34D;padding:2px 8px;border-radius:99px;font-size:0.78rem">最多 ${e.max_attempts} 次</span>`
                     : '<span style="color:#64748B;font-size:0.78rem">無限制</span>'}
+                </td>
+                <td style="text-align:center">
+                  ${e.assignment_count > 0
+                    ? `<span class="exam-assign-badge">👥 ${e.assignment_count} 人</span>`
+                    : '<span style="color:#64748B;font-size:0.78rem">全部</span>'}
                 </td>
                 <td style="font-size:0.8rem">${formatDate(e.start_time)}</td>
                 <td style="font-size:0.8rem">${formatDate(e.end_time)}</td>
@@ -519,18 +524,41 @@ const AdminExams = {
     } catch (err) { Toast.error(err.message); }
   },
 
-  openAddModal()       { this._openModal(null); },
-  openEditModal(id)    { this._openModal(this.exams.find(e => e.id === id)); },
+  openAddModal()    { this._openModal(null); },
+  openEditModal(id) { this._openModal(this.exams.find(e => e.id === id)); },
 
-  _openModal(e) {
+  // 學生清單快取（開啟 modal 時一次性載入）
+  _studentCache: [],
+
+  async _openModal(e) {
     const isEdit = !!e;
-    const toLocalInput = (iso) => {
-      if (!iso) return '';
-      return new Date(iso).toISOString().slice(0, 16);
-    };
+    const toLocalInput = iso => iso ? new Date(iso).toISOString().slice(0, 16) : '';
     const subjectOpts = AppState.subjects.map(s =>
       `<option value="${s.id}" ${e && e.subject_id === s.id ? 'selected' : ''}>${s.icon} ${escapeHtml(s.name)}</option>`
     ).join('');
+
+    // 同步拉取學生清單 & 現有指定名單
+    let students = [], assignedIds = new Set();
+    try {
+      [students, assignedIds] = await Promise.all([
+        API.admin.students(),
+        isEdit
+          ? API.exams.getAssignments(e.id).then(rows => new Set(rows.map(r => r.id)))
+          : Promise.resolve(new Set())
+      ]);
+    } catch (_) {}
+    this._studentCache = students;
+
+    const onlyStudents = students.filter(u => u.role === 'student');
+
+    const studentRows = onlyStudents.map(u => `
+      <label class="assign-student-row ${assignedIds.has(u.id) ? 'selected' : ''}" id="asr_${u.id}">
+        <input type="checkbox" class="assign-cb" value="${u.id}" ${assignedIds.has(u.id) ? 'checked' : ''} onchange="AdminExams._onAssignCheck(this)" />
+        <span class="assign-avatar" style="background:${u.avatar_color||'#3B82F6'}">${(u.display_name||'?')[0]}</span>
+        <span class="assign-name">${escapeHtml(u.display_name)}</span>
+        <span class="assign-user">${escapeHtml(u.username)}</span>
+      </label>
+    `).join('');
 
     Modal.open(isEdit ? '編輯考試' : '新增考試', `
       <div class="modal-form">
@@ -548,7 +576,7 @@ const AdminExams = {
             <select class="form-select" id="eSubject">${subjectOpts}</select>
           </div>
           <div>
-            <label class="form-label">難度篩選（用逗號分隔，如 1,2 或 all）</label>
+            <label class="form-label">難度篩選（逗號分隔，如 1,2 或 all）</label>
             <input type="text" class="form-input" id="eLevelFilter" value="${escapeHtml(e?.level_filter||'all')}" placeholder="all 或 1,2,3" />
           </div>
         </div>
@@ -580,8 +608,27 @@ const AdminExams = {
           <div>
             <label class="form-label">最多參加次數（空白＝無限）</label>
             <input type="number" class="form-input" id="eMaxAttempts" min="1" max="999"
-              value="${e?.max_attempts != null ? e.max_attempts : ''}"
-              placeholder="不限次數" />
+              value="${e?.max_attempts != null ? e.max_attempts : ''}" placeholder="不限次數" />
+          </div>
+        </div>
+
+        <!-- 指定學生 -->
+        <div class="assign-section">
+          <div class="assign-section-header">
+            <span class="form-label" style="margin:0">👥 指定學生</span>
+            <span class="assign-hint">不勾選任何人＝全部學生皆可參加</span>
+            <div class="assign-actions">
+              <button type="button" class="btn-assign-action" onclick="AdminExams._selectAll(true)">全選</button>
+              <button type="button" class="btn-assign-action" onclick="AdminExams._selectAll(false)">清除</button>
+            </div>
+          </div>
+          <div class="assign-count-bar" id="assignCountBar">
+            ${assignedIds.size > 0 ? `已指定 <strong>${assignedIds.size}</strong> 人` : '目前開放給全部學生'}
+          </div>
+          <input type="text" class="assign-search" placeholder="🔍 搜尋學生姓名或帳號..."
+            oninput="AdminExams._filterAssign(this.value)" />
+          <div class="assign-list" id="assignList">
+            ${onlyStudents.length ? studentRows : '<div style="color:#64748B;font-size:0.85rem;padding:12px">目前沒有學生帳號</div>'}
           </div>
         </div>
       </div>
@@ -589,6 +636,35 @@ const AdminExams = {
       <button class="btn-modal-cancel" onclick="Modal.close()">取消</button>
       <button class="btn-modal-save" onclick="AdminExams.save(${e?.id||'null'})">${isEdit ? '儲存變更' : '建立考試'}</button>
     `);
+  },
+
+  _onAssignCheck(cb) {
+    const row = cb.closest('.assign-student-row');
+    if (row) row.classList.toggle('selected', cb.checked);
+    // 更新計數
+    const count = document.querySelectorAll('.assign-cb:checked').length;
+    const bar = document.getElementById('assignCountBar');
+    if (bar) bar.innerHTML = count > 0 ? `已指定 <strong>${count}</strong> 人` : '目前開放給全部學生';
+  },
+
+  _selectAll(checked) {
+    document.querySelectorAll('.assign-cb').forEach(cb => {
+      cb.checked = checked;
+      const row = cb.closest('.assign-student-row');
+      if (row) row.classList.toggle('selected', checked);
+    });
+    const count = checked ? document.querySelectorAll('.assign-cb').length : 0;
+    const bar = document.getElementById('assignCountBar');
+    if (bar) bar.innerHTML = count > 0 ? `已指定 <strong>${count}</strong> 人` : '目前開放給全部學生';
+  },
+
+  _filterAssign(q) {
+    const lower = q.toLowerCase();
+    document.querySelectorAll('.assign-student-row').forEach(row => {
+      const name = row.querySelector('.assign-name')?.textContent.toLowerCase() || '';
+      const user = row.querySelector('.assign-user')?.textContent.toLowerCase() || '';
+      row.style.display = (!q || name.includes(lower) || user.includes(lower)) ? '' : 'none';
+    });
   },
 
   async save(editId) {
@@ -604,6 +680,9 @@ const AdminExams = {
     const maxAttemptsRaw = document.getElementById('eMaxAttempts').value.trim();
     const max_attempts = maxAttemptsRaw ? parseInt(maxAttemptsRaw) : null;
 
+    // 收集已勾選的學生 IDs
+    const assignedIds = [...document.querySelectorAll('.assign-cb:checked')].map(cb => parseInt(cb.value));
+
     if (!title) { Toast.warning('請填寫考試名稱'); return; }
     if (start_time && end_time && new Date(start_time) >= new Date(end_time)) {
       Toast.warning('截止時間必須晚於開始時間'); return;
@@ -612,19 +691,26 @@ const AdminExams = {
       Toast.warning('最多參加次數必須為正整數'); return;
     }
 
-    const toISO = (val) => val ? new Date(val).toISOString() : null;
+    const toISO = val => val ? new Date(val).toISOString() : null;
 
     try {
-      const data = { title, description: desc, subject_id, level_filter, question_count,
+      const data = {
+        title, description: desc, subject_id, level_filter, question_count,
         duration_minutes, start_time: toISO(start_time), end_time: toISO(end_time),
-        passing_score, max_attempts };
+        passing_score, max_attempts
+      };
+      let examId = editId;
       if (editId) {
         await API.exams.update(editId, data);
-        Toast.success('考試更新成功');
       } else {
-        await API.exams.create(data);
-        Toast.success('考試建立成功');
+        const res = await API.exams.create(data);
+        examId = res.id;
       }
+      // 儲存指定學生（無論新增或編輯）
+      await API.exams.setAssignments(examId, assignedIds);
+
+      const assignMsg = assignedIds.length ? `，已指定 ${assignedIds.length} 位學生` : '，開放給全部學生';
+      Toast.success((editId ? '考試更新成功' : '考試建立成功') + assignMsg);
       Modal.close();
       this.load();
     } catch (err) { Toast.error(err.message); }

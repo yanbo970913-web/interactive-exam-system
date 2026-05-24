@@ -59,16 +59,19 @@ const API = (() => {
     },
     // 考試
     exams: {
-      list:       ()        => request('GET',  '/exams'),
-      get:        (id)      => request('GET',  `/exams/${id}`),
-      create:     (data)    => request('POST', '/exams', data),
-      update:     (id, d)   => request('PUT',  `/exams/${id}`, d),
-      delete:     (id)      => request('DELETE',`/exams/${id}`),
-      start:      (id)      => request('POST', `/exams/${id}/start`),
-      submit:     (attemptId, answers) => request('POST', `/exams/attempts/${attemptId}/submit`, { answers }),
-      leaderboard:(id)      => request('GET',  `/exams/${id}/leaderboard`),
-      myAttempts: (id)      => request('GET',  `/exams/${id}/my-attempts`),
-      stats:      ()        => request('GET',  '/exams/stats/overview'),
+      list:        ()        => request('GET',  '/exams'),
+      get:         (id)      => request('GET',  `/exams/${id}`),
+      create:      (data)    => request('POST', '/exams', data),
+      update:      (id, d)   => request('PUT',  `/exams/${id}`, d),
+      delete:      (id)      => request('DELETE',`/exams/${id}`),
+      start:       (id)      => request('POST', `/exams/${id}/start`),
+      submit:      (attemptId, answers) => request('POST', `/exams/attempts/${attemptId}/submit`, { answers }),
+      leaderboard: (id)      => request('GET',  `/exams/${id}/leaderboard`),
+      myAttempts:  (id)      => request('GET',  `/exams/${id}/my-attempts`),
+      stats:       ()        => request('GET',  '/exams/stats/overview'),
+      // 指定學生
+      getAssignments: (id)        => request('GET', `/exams/${id}/assignments`),
+      setAssignments: (id, uids)  => request('PUT', `/exams/${id}/assignments`, { user_ids: uids }),
     },
     // AI
     ai: {

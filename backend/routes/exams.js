@@ -44,7 +44,8 @@ router.get('/', requireAuth, (req, res) => {
            s.name as subject_name, s.icon as subject_icon,
            u.display_name as creator_name,
            (SELECT COUNT(*) FROM exam_attempts WHERE exam_id=e.id AND user_id=? AND status='submitted') as my_attempt_count,
-           (SELECT score FROM exam_attempts WHERE exam_id=e.id AND user_id=? AND status='submitted' ORDER BY score DESC LIMIT 1) as my_best_score
+           (SELECT score FROM exam_attempts WHERE exam_id=e.id AND user_id=? AND status='submitted' ORDER BY score DESC LIMIT 1) as my_best_score,
+           (SELECT COUNT(*) FROM exam_assignments WHERE exam_id=e.id) as assignment_count
     FROM exams e
     JOIN subjects s ON e.subject_id = s.id
     JOIN users u ON e.created_by = u.id
@@ -53,8 +54,17 @@ router.get('/', requireAuth, (req, res) => {
   const params = [req.user.id, req.user.id];
 
   if (!isAdmin) {
-    sql += ` AND e.is_active=1 AND (e.start_time IS NULL OR e.start_time<=?) AND (e.end_time IS NULL OR e.end_time>=?)`;
-    params.push(now, now);
+    // 學生：只顯示開放且在時間範圍內、且（無指定 OR 被指定）的考試
+    sql += `
+      AND e.is_active=1
+      AND (e.start_time IS NULL OR e.start_time<=?)
+      AND (e.end_time   IS NULL OR e.end_time>=?)
+      AND (
+        NOT EXISTS (SELECT 1 FROM exam_assignments WHERE exam_id=e.id)
+        OR EXISTS  (SELECT 1 FROM exam_assignments WHERE exam_id=e.id AND user_id=?)
+      )
+    `;
+    params.push(now, now, req.user.id);
   }
   sql += ' ORDER BY e.created_at DESC';
 
@@ -62,11 +72,48 @@ router.get('/', requireAuth, (req, res) => {
   res.json(exams.map(e => ({
     ...e,
     id: Number(e.id),
-    // 計算剩餘可作答次數
+    assignment_count: Number(e.assignment_count),
     attempts_remaining: (e.max_attempts == null)
       ? null
       : Math.max(0, Number(e.max_attempts) - Number(e.my_attempt_count))
   })));
+});
+
+// GET /api/exams/:id/assignments — 取得指定考試的學生名單
+router.get('/:id/assignments', requireStaff, (req, res) => {
+  const rows = db.prepare(`
+    SELECT u.id, u.username, u.display_name, u.avatar_color, u.avatar_image
+    FROM exam_assignments ea JOIN users u ON ea.user_id=u.id
+    WHERE ea.exam_id=?
+    ORDER BY u.display_name
+  `).all(req.params.id);
+  res.json(rows);
+});
+
+// PUT /api/exams/:id/assignments — 整批設定（覆蓋）
+router.put('/:id/assignments', requireStaff, (req, res) => {
+  const examId = req.params.id;
+  if (!db.prepare('SELECT id FROM exams WHERE id=?').get(examId))
+    return res.status(404).json({ error: '找不到此考試' });
+
+  const { user_ids = [] } = req.body;   // [] 表示清除所有指定（開放給全部）
+
+  db.exec('BEGIN');
+  try {
+    db.prepare('DELETE FROM exam_assignments WHERE exam_id=?').run(examId);
+    const ins = db.prepare('INSERT OR IGNORE INTO exam_assignments (exam_id, user_id) VALUES (?,?)');
+    for (const uid of user_ids) ins.run(examId, uid);
+    db.exec('COMMIT');
+    res.json({
+      message: user_ids.length
+        ? `已指定 ${user_ids.length} 位學生`
+        : '已清除指定（開放給全部學生）',
+      count: user_ids.length
+    });
+  } catch (err) {
+    db.exec('ROLLBACK');
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // GET /api/exams/:id/leaderboard
@@ -158,9 +205,10 @@ router.put('/:id', requireStaff, (req, res) => {
 router.delete('/:id', requireStaff, (req, res) => {
   if (!db.prepare('SELECT id FROM exams WHERE id=?').get(req.params.id))
     return res.status(404).json({ error: '找不到此考試' });
-  db.prepare('DELETE FROM exam_attempts WHERE exam_id=?').run(req.params.id);
+  db.prepare('DELETE FROM exam_attempts    WHERE exam_id=?').run(req.params.id);
   db.prepare('DELETE FROM leaderboard_cache WHERE exam_id=?').run(req.params.id);
-  db.prepare('DELETE FROM exams WHERE id=?').run(req.params.id);
+  db.prepare('DELETE FROM exam_assignments  WHERE exam_id=?').run(req.params.id);
+  db.prepare('DELETE FROM exams             WHERE id=?').run(req.params.id);
   res.json({ message: '考試已刪除' });
 });
 
@@ -181,6 +229,17 @@ router.post('/:id/start', requireAuth, (req, res) => {
       return res.status(403).json({ error: '考試尚未開始' });
     if (exam.end_time && new Date(exam.end_time) < now)
       return res.status(403).json({ error: '考試已截止' });
+    // ── 指定學生限制 ──
+    const assignCount = Number(
+      db.prepare('SELECT COUNT(*) as c FROM exam_assignments WHERE exam_id=?').get(req.params.id).c
+    );
+    if (assignCount > 0) {
+      const isAssigned = db.prepare(
+        'SELECT 1 FROM exam_assignments WHERE exam_id=? AND user_id=?'
+      ).get(req.params.id, req.user.id);
+      if (!isAssigned)
+        return res.status(403).json({ error: '此考試為指定學生專屬，你未在名單中' });
+    }
     // ── 最多參加次數限制 ──
     if (exam.max_attempts != null) {
       const doneCount = Number(db.prepare(
