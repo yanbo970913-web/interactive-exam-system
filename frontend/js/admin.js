@@ -549,7 +549,8 @@ const AdminExams = {
     } catch (_) {}
     this._studentCache = students;
 
-    const onlyStudents = students.filter(u => u.role === 'student');
+    // API.admin.students() 已在後端 WHERE role='student'，不需要再過濾
+    const onlyStudents = students;
 
     const studentRows = onlyStudents.map(u => `
       <label class="assign-student-row ${assignedIds.has(u.id) ? 'selected' : ''}" id="asr_${u.id}">
